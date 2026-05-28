@@ -297,6 +297,7 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if not 0 <= level <= 4:
             raise ValueError(f"invalid ventilation level: {level}")
         await self.transport.send(p.CMD_SET_LEVEL, bytes([level]))
+        await self.transport.send(p.CMD_GET_VENTILATION_LEVEL)
 
     async def async_set_comfort_temperature(self, temperature: float) -> None:
         if not MIN_TEMPERATURE <= temperature <= MAX_TEMPERATURE:
@@ -304,12 +305,16 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         await self.transport.send(
             p.CMD_SET_COMFORT_TEMPERATURE, bytes([p.temp_to_byte(temperature)])
         )
+        await self.transport.send(p.CMD_GET_TEMPERATURES)
 
     async def async_reset_filter(self) -> None:
         await self.transport.send(p.CMD_RESET_AND_SELF_TEST, bytes([0, 0, 0, 1]))
+        await self.transport.send(p.CMD_GET_FAULTS)
+        await self.transport.send(p.CMD_GET_OPERATION_HOURS)
 
     async def async_reset_errors(self) -> None:
         await self.transport.send(p.CMD_RESET_AND_SELF_TEST, bytes([1, 0, 0, 0]))
+        await self.transport.send(p.CMD_GET_FAULTS)
 
 
 _PARSERS: dict[int, Callable[[ComfoAirCoordinator, bytes], None]] = {
