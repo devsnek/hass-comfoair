@@ -204,11 +204,19 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     def _parse_level(self, d: bytes) -> None:
         s = self._state
+        s["return_air_level_absent"] = d[0]
+        s["return_air_level_low"] = d[1]
+        s["return_air_level_medium"] = d[2]
+        s["supply_air_level_absent"] = d[3]
+        s["supply_air_level_low"] = d[4]
+        s["supply_air_level_medium"] = d[5]
         s["return_air_level"] = d[6]
         s["supply_air_level"] = d[7]
         s["ventilation_level"] = d[8] - 1
         s["current_level_raw"] = d[8]
         s["supply_fan_active"] = d[9] == 1
+        s["return_air_level_high"] = d[10]
+        s["supply_air_level_high"] = d[11]
 
     def _parse_temps(self, d: bytes) -> None:
         s = self._state
@@ -315,6 +323,32 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def async_reset_errors(self) -> None:
         await self.transport.send(p.CMD_RESET_AND_SELF_TEST, bytes([1, 0, 0, 0]))
         await self.transport.send(p.CMD_GET_FAULTS)
+
+    async def async_set_fan_percentages(self, **overrides: int) -> None:
+        """Send the eight return/supply fan percentages to the device.
+
+        Any value not given in `overrides` is taken from the last known
+        coordinator state. Raises ValueError if a value is still missing.
+        """
+        keys = (
+            "return_air_level_absent",
+            "return_air_level_low",
+            "return_air_level_medium",
+            "return_air_level_high",
+            "supply_air_level_absent",
+            "supply_air_level_low",
+            "supply_air_level_medium",
+            "supply_air_level_high",
+        )
+        values: list[int] = []
+        for k in keys:
+            v = overrides.get(k, self._state.get(k))
+            if v is None:
+                raise ValueError(f"fan percentage {k} not yet known")
+            values.append(max(15, min(95, int(v))))
+        data = bytes(values + [0x00])
+        await self.transport.send(p.CMD_SET_VENTILATION_LEVEL, data)
+        await self.transport.send(p.CMD_GET_VENTILATION_LEVEL)
 
 
 _PARSERS: dict[int, Callable[[ComfoAirCoordinator, bytes], None]] = {
