@@ -1,0 +1,27 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "ComfoAir",
+        "description": "Select the serial device the ComfoAir is connected to.",
+        "data": {
+          "port": "Serial port"
+        }
+      },
+      "manual_path": {
+        "title": "Enter serial path",
+        "description": "Type the full path to the serial device.",
+        "data": {
+          "port": "Serial port"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot open serial port.",
+      "no_response": "No response from the ventilation unit."
+    },
+    "abort": {
+      "already_configured": "This serial port is already configured."
+    }
+  }
+}
