@@ -334,10 +334,10 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "return_air_level_absent",
             "return_air_level_low",
             "return_air_level_medium",
-            "return_air_level_high",
             "supply_air_level_absent",
             "supply_air_level_low",
             "supply_air_level_medium",
+            "return_air_level_high",
             "supply_air_level_high",
         )
         values: list[int] = []
