@@ -15,6 +15,7 @@ from homeassistant.const import (
     PERCENTAGE,
     REVOLUTIONS_PER_MINUTE,
     UnitOfElectricCurrent,
+    UnitOfElectricPotential,
     UnitOfTemperature,
     UnitOfTime,
     UnitOfVolume,
@@ -205,6 +206,39 @@ SENSORS: tuple[ComfoAirSensorEntityDescription, ...] = (
         name="Kitchen Hood Temperature",
         **_TEMP,
         feature=FEATURE_KITCHEN_HOOD,
+    ),
+    # analog 0-10V inputs (0x13)
+    ComfoAirSensorEntityDescription(
+        key="analog_input_1",
+        name="Analog Input 1",
+        device_class=SensorDeviceClass.VOLTAGE,
+        native_unit_of_measurement=UnitOfElectricPotential.VOLT,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=2,
+    ),
+    ComfoAirSensorEntityDescription(
+        key="analog_input_2",
+        name="Analog Input 2",
+        device_class=SensorDeviceClass.VOLTAGE,
+        native_unit_of_measurement=UnitOfElectricPotential.VOLT,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=2,
+    ),
+    ComfoAirSensorEntityDescription(
+        key="analog_input_3",
+        name="Analog Input 3",
+        device_class=SensorDeviceClass.VOLTAGE,
+        native_unit_of_measurement=UnitOfElectricPotential.VOLT,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=2,
+    ),
+    ComfoAirSensorEntityDescription(
+        key="analog_input_4",
+        name="Analog Input 4",
+        device_class=SensorDeviceClass.VOLTAGE,
+        native_unit_of_measurement=UnitOfElectricPotential.VOLT,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=2,
     ),
     # post-heating diagnostics (read-only; the controller drives them)
     ComfoAirSensorEntityDescription(

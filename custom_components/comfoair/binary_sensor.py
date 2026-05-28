@@ -12,7 +12,12 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, FEATURE_BYPASS, FEATURE_PREHEATING
+from .const import (
+    DOMAIN,
+    FEATURE_BYPASS,
+    FEATURE_KITCHEN_HOOD,
+    FEATURE_PREHEATING,
+)
 from .entity import ComfoAirEntity
 
 
@@ -40,6 +45,26 @@ SENSORS: tuple[ComfoAirBinarySensorEntityDescription, ...] = (
         key="preheating_state",
         name="Preheating State",
         feature=FEATURE_PREHEATING,
+    ),
+    # physical switch inputs (0x03 Eingänge)
+    ComfoAirBinarySensorEntityDescription(key="step_switch_l1", name="Step Switch L1"),
+    ComfoAirBinarySensorEntityDescription(key="step_switch_l2", name="Step Switch L2"),
+    ComfoAirBinarySensorEntityDescription(
+        key="bathroom_switch", name="Bathroom Switch"
+    ),
+    ComfoAirBinarySensorEntityDescription(
+        key="bathroom_switch_2", name="Bathroom Switch 2"
+    ),
+    ComfoAirBinarySensorEntityDescription(
+        key="external_filter_switch", name="External Filter Switch"
+    ),
+    ComfoAirBinarySensorEntityDescription(
+        key="heat_recovery_switch", name="Heat Recovery Switch"
+    ),
+    ComfoAirBinarySensorEntityDescription(
+        key="kitchen_hood_switch",
+        name="Kitchen Hood Switch",
+        feature=FEATURE_KITCHEN_HOOD,
     ),
 )
 

@@ -144,6 +144,8 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             p.CMD_GET_OPERATION_HOURS,
             p.CMD_GET_TIME_DELAY,
             p.CMD_GET_VALVE_STATUS,
+            p.CMD_GET_INPUTS,
+            p.CMD_GET_ANALOG_INPUTS,
         ]
         if self.features[FEATURE_BYPASS]:
             cmds.append(p.CMD_GET_BYPASS_CONTROL_STATUS)
@@ -314,6 +316,23 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def _parse_sensor_data(self, d: bytes) -> None:
         self._state["enthalpy_temperature"] = p.byte_to_temp(d[0])
 
+    def _parse_inputs(self, d: bytes) -> None:
+        s = self._state
+        step = d[0]
+        s["step_switch_l1"] = bool(step & 0x01)
+        s["step_switch_l2"] = bool(step & 0x02)
+        sw = d[1]
+        s["bathroom_switch"] = bool(sw & 0x01)
+        s["kitchen_hood_switch"] = bool(sw & 0x02)
+        s["external_filter_switch"] = bool(sw & 0x04)
+        s["heat_recovery_switch"] = bool(sw & 0x08)
+        s["bathroom_switch_2"] = bool(sw & 0x10)
+
+    def _parse_analog_inputs(self, d: bytes) -> None:
+        s = self._state
+        for i in range(4):
+            s[f"analog_input_{i + 1}"] = round(d[i] * 10.0 / 255.0, 2)
+
     def _parse_ewt_postheating(self, d: bytes) -> None:
         s = self._state
         s["ewt_low_temperature"] = p.byte_to_temp(d[0])
@@ -467,4 +486,6 @@ _PARSERS: dict[int, Callable[[ComfoAirCoordinator, bytes], None]] = {
     p.RES_GET_PREHEATING_STATUS: ComfoAirCoordinator._parse_preheating,
     p.RES_GET_SENSOR_DATA: ComfoAirCoordinator._parse_sensor_data,
     p.RES_GET_EWT_POSTHEATING: ComfoAirCoordinator._parse_ewt_postheating,
+    p.RES_GET_INPUTS: ComfoAirCoordinator._parse_inputs,
+    p.RES_GET_ANALOG_INPUTS: ComfoAirCoordinator._parse_analog_inputs,
 }
