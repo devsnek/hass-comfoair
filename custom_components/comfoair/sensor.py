@@ -120,37 +120,12 @@ SENSORS: tuple[ComfoAirSensorEntityDescription, ...] = (
         key="frost_protection_hours", name="Frost Protection Hours", **_HOURS
     ),
     ComfoAirSensorEntityDescription(key="filter_hours", name="Filter Hours", **_HOURS),
-    # time delays
-    ComfoAirSensorEntityDescription(
-        key="bathroom_switch_on_delay_minutes",
-        name="Bathroom Switch On Delay",
-        **_MINUTES,
-    ),
-    ComfoAirSensorEntityDescription(
-        key="bathroom_switch_off_delay_minutes",
-        name="Bathroom Switch Off Delay",
-        **_MINUTES,
-    ),
-    ComfoAirSensorEntityDescription(
-        key="l1_switch_off_delay_minutes", name="L1 Switch Off Delay", **_MINUTES
-    ),
-    ComfoAirSensorEntityDescription(
-        key="boost_ventilation_minutes", name="Boost Ventilation", **_MINUTES
-    ),
-    ComfoAirSensorEntityDescription(
-        key="filter_warning_weeks",
-        name="Filter Warning Weeks",
-        native_unit_of_measurement="weeks",
-        state_class=SensorStateClass.MEASUREMENT,
-    ),
-    ComfoAirSensorEntityDescription(
-        key="rf_high_time_short_minutes", name="RF High Time Short", **_MINUTES
-    ),
-    ComfoAirSensorEntityDescription(
-        key="rf_high_time_long_minutes", name="RF High Time Long", **_MINUTES
-    ),
     # text / enum-like
     ComfoAirSensorEntityDescription(key="filter_status", name="Filter Status"),
+    ComfoAirSensorEntityDescription(key="current_errors", name="Current Errors"),
+    ComfoAirSensorEntityDescription(key="last_errors", name="Last Errors"),
+    ComfoAirSensorEntityDescription(key="second_last_errors", name="2nd Last Errors"),
+    ComfoAirSensorEntityDescription(key="third_last_errors", name="3rd Last Errors"),
     # bypass (optional)
     ComfoAirSensorEntityDescription(
         key="bypass_valve", name="Bypass Valve", **_PCT, feature=FEATURE_BYPASS
@@ -231,11 +206,18 @@ SENSORS: tuple[ComfoAirSensorEntityDescription, ...] = (
         **_TEMP,
         feature=FEATURE_KITCHEN_HOOD,
     ),
+    # post-heating diagnostics (read-only; the controller drives them)
     ComfoAirSensorEntityDescription(
-        key="extractor_hood_switch_off_delay_minutes",
-        name="Extractor Hood Switch Off Delay",
-        **_MINUTES,
-        feature=FEATURE_KITCHEN_HOOD,
+        key="postheating_power",
+        name="Post-Heating Power",
+        state_class=SensorStateClass.MEASUREMENT,
+        feature=FEATURE_POSTHEATING,
+    ),
+    ComfoAirSensorEntityDescription(
+        key="postheating_power_i",
+        name="Post-Heating Power I",
+        state_class=SensorStateClass.MEASUREMENT,
+        feature=FEATURE_POSTHEATING,
     ),
 )
 

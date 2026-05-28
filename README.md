@@ -22,3 +22,14 @@ This is a list of models that are known to work, feel free to add yours if you t
 * Zehnder ComfoAir Q350 (CAN)
 * Zehnder ComfoAir Q450 (CAN)
 * Zehnder ComfoAir Q600 (CAN)
+
+
+## Connecting to ComfoAir RS232
+
+If your device uses an RJ45 port for RS232, please note that this is not compatible with
+the more commonly found "Cisco Style" RS232 adapeters. If you use one of these it will
+likely damage or destroy your hardware!
+
+This diagram shows the wiring used by ComfoAir devices:
+
+![](https://community-assets.home-assistant.io/original/3X/5/e/5e8c76a9cadf7ed59be6d994c659d15f9ca73b57.png)

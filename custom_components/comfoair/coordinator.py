@@ -151,6 +151,8 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             cmds.append(p.CMD_GET_PREHEATING_STATUS)
         if self.features[FEATURE_ENTHALPY]:
             cmds.append(p.CMD_GET_SENSOR_DATA)
+        if self.features[FEATURE_EWT] or self.features[FEATURE_POSTHEATING]:
+            cmds.append(p.CMD_GET_EWT_POSTHEATING)
         return cmds
 
     # ---- polling -------------------------------------------------------------
@@ -239,10 +241,23 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             s["kitchen_hood_temperature"] = p.byte_to_temp(d[8])
 
     def _parse_faults(self, d: bytes) -> None:
-        status = d[8]
-        self._state["filter_status"] = (
-            "Ok" if status == 0 else "Full" if status == 1 else "Unknown"
-        )
+        s = self._state
+        if len(d) >= 9:
+            status = d[8]
+            s["filter_status"] = (
+                "Ok" if status == 0 else "Full" if status == 1 else "Unknown"
+            )
+        if len(d) >= 17:
+            s["current_errors"] = _format_errors(d[0], d[13], d[1], d[9])
+            s["last_errors"] = _format_errors(d[2], d[14], d[3], d[10])
+            s["second_last_errors"] = _format_errors(d[4], d[15], d[5], d[11])
+            s["third_last_errors"] = _format_errors(d[6], d[16], d[7], d[12])
+        elif len(d) >= 8:
+            # older firmware without EA / A-high bytes
+            s["current_errors"] = _format_errors(d[0], 0, d[1], 0)
+            s["last_errors"] = _format_errors(d[2], 0, d[3], 0)
+            s["second_last_errors"] = _format_errors(d[4], 0, d[5], 0)
+            s["third_last_errors"] = _format_errors(d[6], 0, d[7], 0)
 
     def _parse_hours(self, d: bytes) -> None:
         s = self._state
@@ -299,6 +314,16 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def _parse_sensor_data(self, d: bytes) -> None:
         self._state["enthalpy_temperature"] = p.byte_to_temp(d[0])
 
+    def _parse_ewt_postheating(self, d: bytes) -> None:
+        s = self._state
+        s["ewt_low_temperature"] = p.byte_to_temp(d[0])
+        s["ewt_high_temperature"] = p.byte_to_temp(d[1])
+        s["ewt_speed_up"] = d[2]
+        s["kitchen_hood_speed_up"] = d[3]
+        s["postheating_power"] = d[4]
+        s["postheating_power_i"] = d[5]
+        s["postheating_target_temperature"] = p.byte_to_temp(d[6])
+
     # ---- writes --------------------------------------------------------------
 
     async def async_set_level(self, level: int) -> None:
@@ -350,6 +375,81 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         await self.transport.send(p.CMD_SET_VENTILATION_LEVEL, data)
         await self.transport.send(p.CMD_GET_VENTILATION_LEVEL)
 
+    async def async_set_time_delays(self, **overrides: int) -> None:
+        """Send the eight delay values from 0xCB.
+
+        Any value not given in `overrides` is taken from the last known
+        coordinator state. Raises ValueError if a value is still missing.
+        """
+        keys = (
+            "bathroom_switch_on_delay_minutes",
+            "bathroom_switch_off_delay_minutes",
+            "l1_switch_off_delay_minutes",
+            "boost_ventilation_minutes",
+            "filter_warning_weeks",
+            "rf_high_time_short_minutes",
+            "rf_high_time_long_minutes",
+            "extractor_hood_switch_off_delay_minutes",
+        )
+        values: list[int] = []
+        for k in keys:
+            v = overrides.get(k, self._state.get(k))
+            if v is None:
+                raise ValueError(f"time delay {k} not yet known")
+            values.append(max(0, min(255, int(v))))
+        await self.transport.send(p.CMD_SET_TIME_DELAY, bytes(values))
+        await self.transport.send(p.CMD_GET_TIME_DELAY)
+
+    async def async_set_ewt_postheating(self, **overrides: float) -> None:
+        """Send the five writable EWT/post-heating values from 0xED.
+
+        Temperatures use the (T+20)*2 encoding. Percentages are clamped 0..100.
+        """
+        temp_keys = (
+            "ewt_low_temperature",
+            "ewt_high_temperature",
+            "postheating_target_temperature",
+        )
+        pct_keys = ("ewt_speed_up", "kitchen_hood_speed_up")
+        layout = (
+            "ewt_low_temperature",
+            "ewt_high_temperature",
+            "ewt_speed_up",
+            "kitchen_hood_speed_up",
+            "postheating_target_temperature",
+        )
+        values: list[int] = []
+        for k in layout:
+            v = overrides.get(k, self._state.get(k))
+            if v is None:
+                raise ValueError(f"ewt/postheating value {k} not yet known")
+            if k in temp_keys:
+                values.append(p.temp_to_byte(float(v)))
+            elif k in pct_keys:
+                values.append(max(0, min(100, int(v))))
+        await self.transport.send(p.CMD_SET_EWT_POSTHEATING, bytes(values))
+        await self.transport.send(p.CMD_GET_EWT_POSTHEATING)
+
+
+_A_HIGH_CODES = ("A9", "A10", "A11", "A12", "A13", "A14", "A15", "A0")
+
+
+def _format_errors(a_low: int, a_high: int, e: int, ea: int) -> str:
+    codes: list[str] = []
+    for i in range(8):
+        if a_low & (1 << i):
+            codes.append(f"A{i + 1}")
+    for i in range(8):
+        if a_high & (1 << i):
+            codes.append(_A_HIGH_CODES[i])
+    for i in range(8):
+        if e & (1 << i):
+            codes.append(f"E{i + 1}")
+    for i in range(8):
+        if ea & (1 << i):
+            codes.append(f"EA{i + 1}")
+    return ", ".join(codes) if codes else "OK"
+
 
 _PARSERS: dict[int, Callable[[ComfoAirCoordinator, bytes], None]] = {
     p.RES_GET_BOOTLOADER_VERSION: ComfoAirCoordinator._parse_bootloader,
@@ -366,4 +466,5 @@ _PARSERS: dict[int, Callable[[ComfoAirCoordinator, bytes], None]] = {
     p.RES_GET_BYPASS_CONTROL_STATUS: ComfoAirCoordinator._parse_bypass,
     p.RES_GET_PREHEATING_STATUS: ComfoAirCoordinator._parse_preheating,
     p.RES_GET_SENSOR_DATA: ComfoAirCoordinator._parse_sensor_data,
+    p.RES_GET_EWT_POSTHEATING: ComfoAirCoordinator._parse_ewt_postheating,
 }
