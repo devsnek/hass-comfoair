@@ -10,8 +10,8 @@ from __future__ import annotations
 import asyncio
 import logging
 from typing import Callable
-
 from serialx import Parity, StopBits, open_serial_connection
+from homeassistant.core import HomeAssistant
 
 from .protocol import Frame, FrameParser, encode_frame
 
@@ -24,18 +24,18 @@ DEFAULT_WAIT_TIMEOUT = 2.0
 class ComfoAirTransport:
     """Owns the serial connection and a background read loop."""
 
-    def __init__(
-        self,
-        port: str,
-    ) -> None:
-        self._port = port
-        self._reader: asyncio.StreamReader | None = None
+    def __init__(self, port: str, hass: HomeAssistant) -> None:
+        self.hass = hass
+        self.port = port
+
+        self._reader_task: asyncio.Task[None] | None = None
         self._writer: asyncio.StreamWriter | None = None
-        self._reader_task: asyncio.Task | None = None
         self._write_lock = asyncio.Lock()
+
+        self._is_closing: bool = False
+
         self._waiters: dict[int, list[asyncio.Future[Frame]]] = {}
         self._callbacks: list[Callable[[Frame], None]] = []
-        self._closing = False
 
     @property
     def is_connected(self) -> bool:
@@ -46,20 +46,9 @@ class ComfoAirTransport:
             and not self._reader_task.done()
         )
 
-    async def connect(self) -> None:
-        self._closing = False
+    async def disconnect(self) -> None:
+        self._is_closing = True
         await self._teardown()
-        _LOGGER.debug("Opening serial connection to %s @ %d", self._port, BAUDRATE)
-        self._reader, self._writer = await open_serial_connection(
-            url=self._port,
-            baudrate=BAUDRATE,
-            parity=Parity.NONE,
-            stopbits=StopBits.ONE,
-        )
-        self._reader_task = asyncio.create_task(
-            self._read_loop(), name="comfoair-reader"
-        )
-        _LOGGER.debug("Serial connection to %s established", self._port)
 
     async def _teardown(self) -> None:
         if self._reader_task is not None and not self._reader_task.done():
@@ -75,13 +64,55 @@ class ComfoAirTransport:
                 await self._writer.wait_closed()
             except Exception:  # noqa: BLE001
                 pass
-        self._reader = None
         self._writer = None
         self._fail_waiters(ConnectionError("transport closed"))
 
-    async def close(self) -> None:
-        self._closing = True
+    async def connect(self) -> None:
+        self._is_closing = False
         await self._teardown()
+        _LOGGER.debug("Opening serial connection to %s @ %d", self.port, BAUDRATE)
+        reader, self._writer = await open_serial_connection(
+            url=self.port,
+            baudrate=BAUDRATE,
+            parity=Parity.NONE,
+            stopbits=StopBits.ONE,
+        )
+        self._reader_task = self.hass.async_create_background_task(
+            self._reader(reader), "ComfoAir Serial Reader"
+        )
+        _LOGGER.debug("Serial connection to %s established", self.port)
+
+    async def _reader(self, reader: asyncio.StreamReader) -> None:
+        parser = FrameParser()
+        try:
+            while True:
+                chunk = await reader.read(64)
+                if not chunk:
+                    raise ConnectionError("serial EOF")
+                for frame in parser.feed(chunk):
+                    self._dispatch(frame)
+        except asyncio.CancelledError:
+            raise
+        except Exception as err:  # noqa: BLE001
+            if not self._is_closing:
+                _LOGGER.warning("ComfoAir reader stopped: %s", err)
+                self._fail_waiters(err)
+
+    def _dispatch(self, frame: Frame) -> None:
+        if frame.is_ack:
+            return
+
+        for callback in self._callbacks:
+            try:
+                callback(frame)
+            except Exception:  # noqa: BLE001
+                _LOGGER.exception("error handling frame 0x%02X", frame.msg_id)
+
+        waiters = self._waiters.pop(frame.msg_id, None)
+        if waiters:
+            for fut in waiters:
+                if not fut.done():
+                    fut.set_result(frame)
 
     async def send(self, cmd: int, data: bytes = b"") -> None:
         """Write a command frame. Does not wait for any response."""
@@ -124,34 +155,3 @@ class ComfoAirTransport:
                 if not fut.done():
                     fut.set_exception(err)
         self._waiters.clear()
-
-    async def _read_loop(self) -> None:
-        assert self._reader is not None
-        parser = FrameParser()
-        try:
-            while True:
-                chunk = await self._reader.read(64)
-                if not chunk:
-                    raise ConnectionError("serial EOF")
-                for frame in parser.feed(chunk):
-                    self._dispatch(frame)
-        except asyncio.CancelledError:
-            raise
-        except Exception as err:  # noqa: BLE001
-            if not self._closing:
-                _LOGGER.warning("ComfoAir reader stopped: %s", err)
-                self._fail_waiters(err)
-
-    def _dispatch(self, frame: Frame) -> None:
-        if frame.is_ack:
-            return
-        for callback in self._callbacks:
-            try:
-                callback(frame)
-            except Exception:  # noqa: BLE001
-                _LOGGER.exception("error handling frame 0x%02X", frame.msg_id)
-        waiters = self._waiters.pop(frame.msg_id, None)
-        if waiters:
-            for fut in waiters:
-                if not fut.done():
-                    fut.set_result(frame)

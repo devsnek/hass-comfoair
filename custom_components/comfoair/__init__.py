@@ -30,7 +30,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     _LOGGER.info("Setting up ComfoAir entry %s on %s", name, port)
 
-    transport = ComfoAirTransport(port=port)
+    transport = ComfoAirTransport(port=port, hass=hass)
     coordinator = ComfoAirCoordinator(hass, entry, transport, device_name=name)
 
     try:
@@ -43,13 +43,25 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await coordinator.async_probe()
     except Exception as err:  # noqa: BLE001
         _LOGGER.warning("ComfoAir probe on %s failed: %r", port, err)
-        await transport.close()
+        await transport.disconnect()
         raise ConfigEntryNotReady(f"probe failed: {err}") from err
 
     _LOGGER.info(
-        "ComfoAir probe ok: firmware=%s version=%s features=%s",
+        "ComfoAir probe ok:\n"
+        "  Bootloader %s v%s\n"
+        "  Firmware %s v%s\n"
+        "  Connector Board %s v%s\n"
+        "  CC-Ease v%s\n"
+        "  CC-Luxe v%s\n"
+        "  features=%s",
+        coordinator.bootloader_name,
+        coordinator.bootloader_version,
         coordinator.firmware_name,
         coordinator.firmware_version,
+        coordinator.connector_board_name,
+        coordinator.connector_board_version,
+        coordinator.cc_ease_version,
+        coordinator.cc_luxe_version,
         {k: v for k, v in coordinator.features.items() if v},
     )
 
@@ -68,5 +80,5 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         entry.entry_id, None
     )
     if coordinator is not None:
-        await coordinator.transport.close()
+        await coordinator.transport.disconnect()
     return unloaded

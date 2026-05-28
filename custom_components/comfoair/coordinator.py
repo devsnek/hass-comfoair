@@ -5,15 +5,11 @@ sends back a frame, and the device *also* volunteers state updates without
 being polled. We don't pair requests with responses. Instead, the transport
 dispatches every non-ACK frame to `on_frame`, which looks up a parser by
 msg_id and pushes the updated state to entities.
-
-The `_async_update_data` tick acts as a poll scheduler: each tick sends the
-next command in a rotating list.
 """
 
 from __future__ import annotations
 
 import asyncio
-import itertools
 import logging
 from datetime import timedelta
 from typing import Any, Callable
@@ -40,7 +36,7 @@ from .transport import ComfoAirTransport
 
 _LOGGER = logging.getLogger(__name__)
 
-POLL_INTERVAL = timedelta(milliseconds=600)
+POLL_INTERVAL = timedelta(seconds=10)
 PROBE_TIMEOUT = 3.0
 
 
@@ -52,6 +48,12 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     device_name: str
     firmware_name: str | None = None
     firmware_version: str | None = None
+    bootloader_name: str | None = None
+    bootloader_version: str | None = None
+    connector_board_name: str | None = None
+    connector_board_version: str | None = None
+    cc_ease_version: str | None = None
+    cc_luxe_version: str | None = None
 
     def __init__(
         self,
@@ -79,7 +81,6 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             FEATURE_EWT: False,
         }
         self._state: dict[str, Any] = {}
-        self._poll_cycle: itertools.cycle = itertools.cycle(self._poll_commands())
         self.transport.add_callback(self.on_frame)
 
     # ---- frame dispatch ------------------------------------------------------
@@ -115,13 +116,24 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             timeout=PROBE_TIMEOUT,
         )
 
+        _LOGGER.debug("Probe: requesting bootloader version")
+        await self.transport.request(
+            p.CMD_GET_BOOTLOADER_VERSION,
+            p.RES_GET_BOOTLOADER_VERSION,
+            timeout=PROBE_TIMEOUT,
+        )
+
+        _LOGGER.debug("Probe: requesting connector board version")
+        await self.transport.request(
+            p.CMD_GET_CONNECTOR_BOARD_VERSION,
+            p.RES_GET_CONNECTOR_BOARD_VERSION,
+            timeout=PROBE_TIMEOUT,
+        )
+
         _LOGGER.debug("Probe: requesting status")
         await self.transport.request(
             p.CMD_GET_STATUS, p.RES_GET_STATUS, timeout=PROBE_TIMEOUT
         )
-
-        # Now that we know which features are present, build the poll list.
-        self._poll_cycle = itertools.cycle(self._poll_commands())
 
     def _poll_commands(self) -> list[int]:
         cmds = [
@@ -147,20 +159,30 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         try:
             if not self.transport.is_connected:
                 await self.transport.connect()
-            cmd = next(self._poll_cycle)
-            await self.transport.send(cmd)
+            for cmd in self._poll_commands():
+                await self.transport.send(cmd)
+                await asyncio.sleep(0.5)
         except (ConnectionError, asyncio.TimeoutError) as err:
             raise UpdateFailed(str(err)) from err
         return dict(self._state)
 
     # ---- parsers (data slices map directly to msg bytes in registers.h) ------
 
+    def _parse_bootloader(self, d: bytes) -> None:
+        self.bootloader_version = f"{d[0]}.{d[1]:02d}b{d[2]}"
+        self.bootloader_name = d[3:13].rstrip(b"\x00").decode("ascii", errors="replace")
+
     def _parse_firmware(self, d: bytes) -> None:
-        if len(d) >= 13:
-            self.firmware_name = (
-                d[3:13].rstrip(b"\x00").decode("ascii", errors="replace")
-            )
-            self.firmware_version = f"{d[0]}.{d[1]:02d}b{d[2]}"
+        self.firmware_version = f"{d[0]}.{d[1]:02d}b{d[2]}"
+        self.firmware_name = d[3:13].rstrip(b"\x00").decode("ascii", errors="replace")
+
+    def _parse_connector_board(self, d: bytes) -> None:
+        self.connector_board_version = f"{d[0]}.{d[1]:02d}"
+        self.connector_board_name = (
+            d[2:12].rstrip(b"\x00").decode("ascii", errors="replace")
+        )
+        self.cc_ease_version = f"{d[12] >> 4}.{d[12] & 0x0f:02d}" if d[12] else None
+        self.cc_luxe_version = f"{d[13] >> 4}.{d[13] & 0x0f:02d}" if d[13] else None
 
     def _parse_status(self, d: bytes) -> None:
         self.features = {
@@ -275,10 +297,6 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if not 0 <= level <= 4:
             raise ValueError(f"invalid ventilation level: {level}")
         await self.transport.send(p.CMD_SET_LEVEL, bytes([level]))
-        # Nudge the device for a fresh state read; the response flows in via
-        # on_frame.
-        await self.transport.send(p.CMD_GET_VENTILATION_LEVEL)
-        await self.transport.send(p.CMD_GET_FAN_STATUS)
 
     async def async_set_comfort_temperature(self, temperature: float) -> None:
         if not MIN_TEMPERATURE <= temperature <= MAX_TEMPERATURE:
@@ -286,22 +304,18 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         await self.transport.send(
             p.CMD_SET_COMFORT_TEMPERATURE, bytes([p.temp_to_byte(temperature)])
         )
-        await self.transport.send(p.CMD_GET_TEMPERATURES)
 
     async def async_reset_filter(self) -> None:
         await self.transport.send(p.CMD_RESET_AND_SELF_TEST, bytes([0, 0, 0, 1]))
-        await self.transport.send(p.CMD_GET_FAULTS)
-        await self.transport.send(p.CMD_GET_OPERATION_HOURS)
 
     async def async_reset_errors(self) -> None:
         await self.transport.send(p.CMD_RESET_AND_SELF_TEST, bytes([1, 0, 0, 0]))
-        await self.transport.send(p.CMD_GET_FAULTS)
 
 
-# Map response msg_id -> coordinator method. Defined after the class so the
-# methods are resolved as descriptors of ComfoAirCoordinator.
 _PARSERS: dict[int, Callable[[ComfoAirCoordinator, bytes], None]] = {
+    p.RES_GET_BOOTLOADER_VERSION: ComfoAirCoordinator._parse_bootloader,
     p.RES_GET_FIRMWARE_VERSION: ComfoAirCoordinator._parse_firmware,
+    p.RES_GET_CONNECTOR_BOARD_VERSION: ComfoAirCoordinator._parse_connector_board,
     p.RES_GET_STATUS: ComfoAirCoordinator._parse_status,
     p.RES_GET_FAN_STATUS: ComfoAirCoordinator._parse_fan,
     p.RES_GET_VENTILATION_LEVEL: ComfoAirCoordinator._parse_level,

@@ -83,7 +83,7 @@ class ComfoAirConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def _probe(self, port: str) -> str | None:
         """Open the port and verify the device responds. Returns an error key or None."""
-        transport = ComfoAirTransport(port=port)
+        transport = ComfoAirTransport(port=port, hass=self.hass)
         try:
             await transport.connect()
         except Exception as err:  # noqa: BLE001
@@ -99,5 +99,5 @@ class ComfoAirConfigFlow(ConfigFlow, domain=DOMAIN):
             _LOGGER.warning("ComfoAir probe: no response on %s: %s", port, err)
             return "no_response"
         finally:
-            await transport.close()
+            await transport.disconnect()
         return None
