@@ -36,7 +36,7 @@ from .transport import ComfoAirTransport
 
 _LOGGER = logging.getLogger(__name__)
 
-POLL_INTERVAL = timedelta(seconds=10)
+POLL_INTERVAL = timedelta(seconds=5)
 PROBE_TIMEOUT = 3.0
 
 
@@ -165,7 +165,6 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 await self.transport.connect()
             for cmd in self._poll_commands():
                 await self.transport.send(cmd)
-                await asyncio.sleep(0.5)
         except (ConnectionError, asyncio.TimeoutError) as err:
             raise UpdateFailed(str(err)) from err
         return dict(self._state)
