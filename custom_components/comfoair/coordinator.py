@@ -210,9 +210,9 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     def _parse_fan(self, d: bytes) -> None:
         s = self._state
-        s["intake_fan_speed"] = d[0]
+        s["supply_fan_speed"] = d[0]
         s["exhaust_fan_speed"] = d[1]
-        s["intake_fan_speed_rpm"] = p.rpm_from_period(p.u16(d, 2))
+        s["supply_fan_speed_rpm"] = p.rpm_from_period(p.u16(d, 2))
         s["exhaust_fan_speed_rpm"] = p.rpm_from_period(p.u16(d, 4))
 
     def _parse_level(self, d: bytes) -> None:

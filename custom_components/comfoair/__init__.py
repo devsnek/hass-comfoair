@@ -8,6 +8,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PORT, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.helpers import entity_registry as er
 
 from .const import DEFAULT_NAME, DOMAIN
 from .coordinator import ComfoAirCoordinator
@@ -24,12 +25,43 @@ PLATFORMS: list[Platform] = [
 ]
 
 
+# Old unique-id suffix -> new suffix, for keys renamed to match Zehnder's
+# supply/return/outside/exhaust terminology (the "intake" fan is the supply fan).
+_UNIQUE_ID_MIGRATIONS = {
+    "intake_fan_speed": "supply_fan_speed",
+    "intake_fan_speed_rpm": "supply_fan_speed_rpm",
+}
+
+
+def _migrate_unique_ids(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Rename entity-registry unique IDs for keys that have been renamed."""
+    registry = er.async_get(hass)
+    prefix = f"{entry.entry_id}_"
+    for old_suffix, new_suffix in _UNIQUE_ID_MIGRATIONS.items():
+        old_unique_id = f"{prefix}{old_suffix}"
+        new_unique_id = f"{prefix}{new_suffix}"
+        entity_id = registry.async_get_entity_id(
+            Platform.SENSOR, DOMAIN, old_unique_id
+        )
+        if entity_id is None:
+            continue
+        if registry.async_get_entity_id(Platform.SENSOR, DOMAIN, new_unique_id):
+            # New entity already exists; drop the stale one to avoid a clash.
+            _LOGGER.debug("Removing stale entity %s during migration", entity_id)
+            registry.async_remove(entity_id)
+            continue
+        _LOGGER.info("Migrating unique_id %s -> %s", old_unique_id, new_unique_id)
+        registry.async_update_entity(entity_id, new_unique_id=new_unique_id)
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up ComfoAir from a config entry."""
     port = entry.data[CONF_PORT]
     name = entry.title or DEFAULT_NAME
 
     _LOGGER.info("Setting up ComfoAir entry %s on %s", name, port)
+
+    _migrate_unique_ids(hass, entry)
 
     transport = ComfoAirTransport(port=port, hass=hass)
     coordinator = ComfoAirCoordinator(hass, entry, transport, device_name=name)
