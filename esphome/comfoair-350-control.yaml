@@ -1,0 +1,26 @@
+# -----------------------------
+# UART → MAX3232 → ComfoAir
+# -----------------------------
+uart:
+  id: uart_bus
+  tx_pin: GPIOXX        # UART1 TX on LilyGO POE (safe, not used by Ethernet)
+  rx_pin: GPIOXX        # UART1 RX on LilyGO POE
+  baud_rate: 9600       # ComfoAir RS232 speed
+  parity: NONE
+  stop_bits: 1
+  data_bits: 8
+  rx_buffer_size: 512
+
+  debug:
+    direction: BOTH
+    dummy_receiver: true
+
+# -----------------------------
+# SERIAL PROXY (ESPHome 2026.5.x)
+# Exposes the UART as a virtual RS232 port to Home Assistant
+# -----------------------------
+serial_proxy:
+  - id: serial_proxy_1
+    uart_id: uart_bus
+    name: "ComfoAir RS232"
+    port_type: RS232
