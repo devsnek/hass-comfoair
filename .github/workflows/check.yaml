@@ -22,3 +22,6 @@ jobs:
 
       - name: Check types
         run: uv check --locked --all-extras --dev
+
+      - name: Test
+        run: uv run pytest

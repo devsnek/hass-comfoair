@@ -100,8 +100,11 @@ def _escape(body: bytes) -> bytes:
 
 def encode_frame(cmd: int, data: bytes = b"") -> bytes:
     """Serialize a command frame ready to write to the UART."""
-    body = bytes([cmd, len(data)]) + data + bytes([_checksum(cmd, data)])
-    return bytes([PREFIX, HEAD, 0x00]) + _escape(body) + bytes([PREFIX, TAIL])
+    return (
+        bytes([PREFIX, HEAD, 0x00, cmd, len(data)])
+        + _escape(data + bytes([_checksum(cmd, data)]))
+        + bytes([PREFIX, TAIL])
+    )
 
 
 # --- decoding -----------------------------------------------------------------
