@@ -211,9 +211,9 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def _parse_fan(self, d: bytes) -> None:
         s = self._state
         s["supply_fan_speed"] = d[0]
-        s["exhaust_fan_speed"] = d[1]
+        s["return_fan_speed"] = d[1]
         s["supply_fan_speed_rpm"] = p.rpm_from_period(p.u16(d, 2))
-        s["exhaust_fan_speed_rpm"] = p.rpm_from_period(p.u16(d, 4))
+        s["return_fan_speed_rpm"] = p.rpm_from_period(p.u16(d, 4))
 
     def _parse_level(self, d: bytes) -> None:
         s = self._state
@@ -296,7 +296,7 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         s = self._state
         s["bypass_valve"] = d[0]
         s["bypass_valve_open"] = d[0] != 0
-        s["preheating_state"] = d[1] != 0
+        s["preheating_valve_open"] = d[1] == 1
         s["motor_current_bypass"] = d[2]
         s["motor_current_preheating"] = d[3]
 
@@ -327,10 +327,10 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         s["preheating_state"] = d[2] != 0
         s["frost_protection_minutes"] = p.u16(d, 3)
         s["frost_protection_level"] = {
-            0: "GuaranteedProtection",
-            1: "HighProtection",
-            2: "NominalProtection",
-            3: "Economy",
+            1: "Guaranteed Protection",
+            2: "High Protection",
+            3: "Nominal Protection",
+            4: "Economy",
         }.get(d[5], "Unknown")
 
     def _parse_sensor_data(self, d: bytes) -> None:

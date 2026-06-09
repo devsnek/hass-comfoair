@@ -14,11 +14,9 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     PERCENTAGE,
     REVOLUTIONS_PER_MINUTE,
-    UnitOfElectricCurrent,
     UnitOfElectricPotential,
     UnitOfTemperature,
     UnitOfTime,
-    UnitOfVolume,
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -71,13 +69,13 @@ SENSORS: tuple[ComfoAirSensorEntityDescription, ...] = (
         key="supply_fan_speed", name="Supply Fan Speed", **_PCT
     ),
     ComfoAirSensorEntityDescription(
-        key="exhaust_fan_speed", name="Exhaust Fan Speed", **_PCT
+        key="return_fan_speed", name="Return Fan Speed", **_PCT
     ),
     ComfoAirSensorEntityDescription(
         key="supply_fan_speed_rpm", name="Supply Fan Speed RPM", **_RPM
     ),
     ComfoAirSensorEntityDescription(
-        key="exhaust_fan_speed_rpm", name="Exhaust Fan Speed RPM", **_RPM
+        key="return_fan_speed_rpm", name="Return Fan Speed RPM", **_RPM
     ),
     # ventilation level
     ComfoAirSensorEntityDescription(
@@ -86,18 +84,10 @@ SENSORS: tuple[ComfoAirSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
     ),
     ComfoAirSensorEntityDescription(
-        key="return_air_level",
-        name="Return Air Level",
-        native_unit_of_measurement=UnitOfVolume.CUBIC_METERS,
-        state_class=SensorStateClass.MEASUREMENT,
-        suggested_display_precision=1,
+        key="return_air_level", name="Return Air Level", **_PCT
     ),
     ComfoAirSensorEntityDescription(
-        key="supply_air_level",
-        name="Supply Air Level",
-        native_unit_of_measurement=UnitOfVolume.CUBIC_METERS,
-        state_class=SensorStateClass.MEASUREMENT,
-        suggested_display_precision=1,
+        key="supply_air_level", name="Supply Air Level", **_PCT
     ),
     # temperatures
     ComfoAirSensorEntityDescription(
@@ -146,23 +136,18 @@ SENSORS: tuple[ComfoAirSensorEntityDescription, ...] = (
         **_HOURS,
         feature=FEATURE_BYPASS,
     ),
+    # raw ADC counts (0..255) "Motorstrom (ADC Rohdaten)"
     ComfoAirSensorEntityDescription(
         key="motor_current_bypass",
         name="Motor Current Bypass",
-        device_class=SensorDeviceClass.CURRENT,
-        native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
         state_class=SensorStateClass.MEASUREMENT,
-        suggested_display_precision=1,
         feature=FEATURE_BYPASS,
     ),
     # preheating (optional)
     ComfoAirSensorEntityDescription(
         key="motor_current_preheating",
         name="Motor Current Preheating",
-        device_class=SensorDeviceClass.CURRENT,
-        native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
         state_class=SensorStateClass.MEASUREMENT,
-        suggested_display_precision=1,
         feature=FEATURE_PREHEATING,
     ),
     ComfoAirSensorEntityDescription(
