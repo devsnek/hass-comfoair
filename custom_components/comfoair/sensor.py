@@ -65,137 +65,98 @@ _MINUTES = dict(
 
 SENSORS: tuple[ComfoAirSensorEntityDescription, ...] = (
     # fan
-    ComfoAirSensorEntityDescription(
-        key="supply_fan_speed", name="Supply Fan Speed", **_PCT
-    ),
-    ComfoAirSensorEntityDescription(
-        key="return_fan_speed", name="Return Fan Speed", **_PCT
-    ),
-    ComfoAirSensorEntityDescription(
-        key="supply_fan_speed_rpm", name="Supply Fan Speed RPM", **_RPM
-    ),
-    ComfoAirSensorEntityDescription(
-        key="return_fan_speed_rpm", name="Return Fan Speed RPM", **_RPM
-    ),
+    ComfoAirSensorEntityDescription(key="supply_fan_speed", **_PCT),
+    ComfoAirSensorEntityDescription(key="return_fan_speed", **_PCT),
+    ComfoAirSensorEntityDescription(key="supply_fan_speed_rpm", **_RPM),
+    ComfoAirSensorEntityDescription(key="return_fan_speed_rpm", **_RPM),
     # ventilation level
     ComfoAirSensorEntityDescription(
         key="ventilation_level",
-        name="Ventilation Level",
         state_class=SensorStateClass.MEASUREMENT,
     ),
-    ComfoAirSensorEntityDescription(
-        key="return_air_level", name="Return Air Level", **_PCT
-    ),
-    ComfoAirSensorEntityDescription(
-        key="supply_air_level", name="Supply Air Level", **_PCT
-    ),
+    ComfoAirSensorEntityDescription(key="return_air_level", **_PCT),
+    ComfoAirSensorEntityDescription(key="supply_air_level", **_PCT),
     # temperatures
-    ComfoAirSensorEntityDescription(
-        key="outside_air_temperature", name="Outside Air Temperature", **_TEMP
-    ),
-    ComfoAirSensorEntityDescription(
-        key="supply_air_temperature", name="Supply Air Temperature", **_TEMP
-    ),
-    ComfoAirSensorEntityDescription(
-        key="return_air_temperature", name="Return Air Temperature", **_TEMP
-    ),
-    ComfoAirSensorEntityDescription(
-        key="exhaust_air_temperature", name="Exhaust Air Temperature", **_TEMP
-    ),
+    ComfoAirSensorEntityDescription(key="outside_air_temperature", **_TEMP),
+    ComfoAirSensorEntityDescription(key="supply_air_temperature", **_TEMP),
+    ComfoAirSensorEntityDescription(key="return_air_temperature", **_TEMP),
+    ComfoAirSensorEntityDescription(key="exhaust_air_temperature", **_TEMP),
     # operation hours
-    ComfoAirSensorEntityDescription(key="level0_hours", name="Level 0 Hours", **_HOURS),
-    ComfoAirSensorEntityDescription(key="level1_hours", name="Level 1 Hours", **_HOURS),
-    ComfoAirSensorEntityDescription(key="level2_hours", name="Level 2 Hours", **_HOURS),
-    ComfoAirSensorEntityDescription(key="level3_hours", name="Level 3 Hours", **_HOURS),
-    ComfoAirSensorEntityDescription(
-        key="frost_protection_hours", name="Frost Protection Hours", **_HOURS
-    ),
-    ComfoAirSensorEntityDescription(key="filter_hours", name="Filter Hours", **_HOURS),
+    ComfoAirSensorEntityDescription(key="level0_hours", **_HOURS),
+    ComfoAirSensorEntityDescription(key="level1_hours", **_HOURS),
+    ComfoAirSensorEntityDescription(key="level2_hours", **_HOURS),
+    ComfoAirSensorEntityDescription(key="level3_hours", **_HOURS),
+    ComfoAirSensorEntityDescription(key="frost_protection_hours", **_HOURS),
+    ComfoAirSensorEntityDescription(key="filter_hours", **_HOURS),
     # text / enum-like
-    ComfoAirSensorEntityDescription(key="filter_status", name="Filter Status"),
-    ComfoAirSensorEntityDescription(key="current_errors", name="Current Errors"),
-    ComfoAirSensorEntityDescription(key="last_errors", name="Last Errors"),
-    ComfoAirSensorEntityDescription(key="second_last_errors", name="2nd Last Errors"),
-    ComfoAirSensorEntityDescription(key="third_last_errors", name="3rd Last Errors"),
+    ComfoAirSensorEntityDescription(key="filter_status"),
+    ComfoAirSensorEntityDescription(key="current_errors"),
+    ComfoAirSensorEntityDescription(key="last_errors"),
+    ComfoAirSensorEntityDescription(key="second_last_errors"),
+    ComfoAirSensorEntityDescription(key="third_last_errors"),
     # bypass (optional)
     ComfoAirSensorEntityDescription(
-        key="bypass_valve", name="Bypass Valve", **_PCT, feature=FEATURE_BYPASS
+        key="bypass_valve", **_PCT, feature=FEATURE_BYPASS
     ),
-    ComfoAirSensorEntityDescription(
-        key="bypass_factor", name="Bypass Factor", feature=FEATURE_BYPASS
-    ),
-    ComfoAirSensorEntityDescription(
-        key="bypass_step", name="Bypass Step", feature=FEATURE_BYPASS
-    ),
-    ComfoAirSensorEntityDescription(
-        key="bypass_correction", name="Bypass Correction", feature=FEATURE_BYPASS
-    ),
+    ComfoAirSensorEntityDescription(key="bypass_factor", feature=FEATURE_BYPASS),
+    ComfoAirSensorEntityDescription(key="bypass_step", feature=FEATURE_BYPASS),
+    ComfoAirSensorEntityDescription(key="bypass_correction", feature=FEATURE_BYPASS),
     ComfoAirSensorEntityDescription(
         key="bypass_open_hours",
-        name="Bypass Open Hours",
         **_HOURS,
         feature=FEATURE_BYPASS,
     ),
     # raw ADC counts (0..255) "Motorstrom (ADC Rohdaten)"
     ComfoAirSensorEntityDescription(
         key="motor_current_bypass",
-        name="Motor Current Bypass",
         state_class=SensorStateClass.MEASUREMENT,
         feature=FEATURE_BYPASS,
     ),
     # preheating (optional)
     ComfoAirSensorEntityDescription(
         key="motor_current_preheating",
-        name="Motor Current Preheating",
         state_class=SensorStateClass.MEASUREMENT,
         feature=FEATURE_PREHEATING,
     ),
     ComfoAirSensorEntityDescription(
         key="preheating_hours",
-        name="Preheating Hours",
         **_HOURS,
         feature=FEATURE_PREHEATING,
     ),
     ComfoAirSensorEntityDescription(
         key="frost_protection_minutes",
-        name="Frost Protection Minutes",
         **_MINUTES,
         feature=FEATURE_PREHEATING,
     ),
     ComfoAirSensorEntityDescription(
-        key="preheating_valve", name="Preheating Valve", feature=FEATURE_PREHEATING
+        key="preheating_valve", feature=FEATURE_PREHEATING
     ),
     ComfoAirSensorEntityDescription(
         key="frost_protection_level",
-        name="Frost Protection Level",
         feature=FEATURE_PREHEATING,
     ),
     # enthalpy / EWT / post-heating / kitchen hood (optional temps)
     ComfoAirSensorEntityDescription(
         key="enthalpy_temperature",
-        name="Enthalpy Temperature",
         **_TEMP,
         feature=FEATURE_ENTHALPY,
     ),
     ComfoAirSensorEntityDescription(
-        key="ewt_temperature", name="EWT Temperature", **_TEMP, feature=FEATURE_EWT
+        key="ewt_temperature", **_TEMP, feature=FEATURE_EWT
     ),
     ComfoAirSensorEntityDescription(
         key="reheating_temperature",
-        name="Reheating Temperature",
         **_TEMP,
         feature=FEATURE_POSTHEATING,
     ),
     ComfoAirSensorEntityDescription(
         key="kitchen_hood_temperature",
-        name="Kitchen Hood Temperature",
         **_TEMP,
         feature=FEATURE_KITCHEN_HOOD,
     ),
     # analog 0-10V inputs (0x13)
     ComfoAirSensorEntityDescription(
         key="analog_input_1",
-        name="Analog Input 1",
         device_class=SensorDeviceClass.VOLTAGE,
         native_unit_of_measurement=UnitOfElectricPotential.VOLT,
         state_class=SensorStateClass.MEASUREMENT,
@@ -203,7 +164,6 @@ SENSORS: tuple[ComfoAirSensorEntityDescription, ...] = (
     ),
     ComfoAirSensorEntityDescription(
         key="analog_input_2",
-        name="Analog Input 2",
         device_class=SensorDeviceClass.VOLTAGE,
         native_unit_of_measurement=UnitOfElectricPotential.VOLT,
         state_class=SensorStateClass.MEASUREMENT,
@@ -211,7 +171,6 @@ SENSORS: tuple[ComfoAirSensorEntityDescription, ...] = (
     ),
     ComfoAirSensorEntityDescription(
         key="analog_input_3",
-        name="Analog Input 3",
         device_class=SensorDeviceClass.VOLTAGE,
         native_unit_of_measurement=UnitOfElectricPotential.VOLT,
         state_class=SensorStateClass.MEASUREMENT,
@@ -219,7 +178,6 @@ SENSORS: tuple[ComfoAirSensorEntityDescription, ...] = (
     ),
     ComfoAirSensorEntityDescription(
         key="analog_input_4",
-        name="Analog Input 4",
         device_class=SensorDeviceClass.VOLTAGE,
         native_unit_of_measurement=UnitOfElectricPotential.VOLT,
         state_class=SensorStateClass.MEASUREMENT,
@@ -228,13 +186,11 @@ SENSORS: tuple[ComfoAirSensorEntityDescription, ...] = (
     # post-heating diagnostics (read-only; the controller drives them)
     ComfoAirSensorEntityDescription(
         key="postheating_power",
-        name="Post-Heating Power",
         state_class=SensorStateClass.MEASUREMENT,
         feature=FEATURE_POSTHEATING,
     ),
     ComfoAirSensorEntityDescription(
         key="postheating_power_i",
-        name="Post-Heating Power I",
         state_class=SensorStateClass.MEASUREMENT,
         feature=FEATURE_POSTHEATING,
     ),

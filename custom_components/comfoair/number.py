@@ -33,21 +33,20 @@ class ComfoAirNumberEntityDescription(NumberEntityDescription):
     setter: str = "async_set_fan_percentages"
 
 
-_FAN_LEVELS: tuple[tuple[str, str], ...] = (
-    ("return_air_level_absent", "Return Air Level Absent"),
-    ("return_air_level_low", "Return Air Level Low"),
-    ("return_air_level_medium", "Return Air Level Medium"),
-    ("return_air_level_high", "Return Air Level High"),
-    ("supply_air_level_absent", "Supply Air Level Absent"),
-    ("supply_air_level_low", "Supply Air Level Low"),
-    ("supply_air_level_medium", "Supply Air Level Medium"),
-    ("supply_air_level_high", "Supply Air Level High"),
+_FAN_LEVELS: tuple[str, ...] = (
+    "return_air_level_absent",
+    "return_air_level_low",
+    "return_air_level_medium",
+    "return_air_level_high",
+    "supply_air_level_absent",
+    "supply_air_level_low",
+    "supply_air_level_medium",
+    "supply_air_level_high",
 )
 
 _FAN_NUMBERS: tuple[ComfoAirNumberEntityDescription, ...] = tuple(
     ComfoAirNumberEntityDescription(
         key=key,
-        name=name,
         native_unit_of_measurement=PERCENTAGE,
         native_min_value=15,
         native_max_value=95,
@@ -55,7 +54,7 @@ _FAN_NUMBERS: tuple[ComfoAirNumberEntityDescription, ...] = tuple(
         mode=NumberMode.BOX,
         icon="mdi:fan",
     )
-    for key, name in _FAN_LEVELS
+    for key in _FAN_LEVELS
 )
 
 _MIN = dict(
@@ -67,7 +66,6 @@ _MIN = dict(
 _TIME_DELAY_NUMBERS: tuple[ComfoAirNumberEntityDescription, ...] = (
     ComfoAirNumberEntityDescription(
         key="bathroom_switch_on_delay_minutes",
-        name="Bathroom Switch On Delay",
         native_min_value=0,
         native_max_value=15,
         setter="async_set_time_delays",
@@ -75,7 +73,6 @@ _TIME_DELAY_NUMBERS: tuple[ComfoAirNumberEntityDescription, ...] = (
     ),
     ComfoAirNumberEntityDescription(
         key="bathroom_switch_off_delay_minutes",
-        name="Bathroom Switch Off Delay",
         native_min_value=0,
         native_max_value=120,
         setter="async_set_time_delays",
@@ -83,7 +80,6 @@ _TIME_DELAY_NUMBERS: tuple[ComfoAirNumberEntityDescription, ...] = (
     ),
     ComfoAirNumberEntityDescription(
         key="l1_switch_off_delay_minutes",
-        name="L1 Switch Off Delay",
         native_min_value=0,
         native_max_value=120,
         setter="async_set_time_delays",
@@ -91,7 +87,6 @@ _TIME_DELAY_NUMBERS: tuple[ComfoAirNumberEntityDescription, ...] = (
     ),
     ComfoAirNumberEntityDescription(
         key="boost_ventilation_minutes",
-        name="Boost Ventilation",
         native_min_value=0,
         native_max_value=60,
         setter="async_set_time_delays",
@@ -99,7 +94,6 @@ _TIME_DELAY_NUMBERS: tuple[ComfoAirNumberEntityDescription, ...] = (
     ),
     ComfoAirNumberEntityDescription(
         key="filter_warning_weeks",
-        name="Filter Warning Weeks",
         native_unit_of_measurement="weeks",
         native_min_value=1,
         native_max_value=52,
@@ -109,7 +103,6 @@ _TIME_DELAY_NUMBERS: tuple[ComfoAirNumberEntityDescription, ...] = (
     ),
     ComfoAirNumberEntityDescription(
         key="rf_high_time_short_minutes",
-        name="RF High Time Short",
         native_min_value=0,
         native_max_value=60,
         setter="async_set_time_delays",
@@ -117,7 +110,6 @@ _TIME_DELAY_NUMBERS: tuple[ComfoAirNumberEntityDescription, ...] = (
     ),
     ComfoAirNumberEntityDescription(
         key="rf_high_time_long_minutes",
-        name="RF High Time Long",
         native_min_value=0,
         native_max_value=120,
         setter="async_set_time_delays",
@@ -125,7 +117,6 @@ _TIME_DELAY_NUMBERS: tuple[ComfoAirNumberEntityDescription, ...] = (
     ),
     ComfoAirNumberEntityDescription(
         key="extractor_hood_switch_off_delay_minutes",
-        name="Extractor Hood Switch Off Delay",
         native_min_value=0,
         native_max_value=120,
         setter="async_set_time_delays",
@@ -137,7 +128,6 @@ _TIME_DELAY_NUMBERS: tuple[ComfoAirNumberEntityDescription, ...] = (
 _EWT_POSTHEAT_NUMBERS: tuple[ComfoAirNumberEntityDescription, ...] = (
     ComfoAirNumberEntityDescription(
         key="ewt_low_temperature",
-        name="EWT Low Temperature",
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         native_min_value=-20,
         native_max_value=40,
@@ -148,7 +138,6 @@ _EWT_POSTHEAT_NUMBERS: tuple[ComfoAirNumberEntityDescription, ...] = (
     ),
     ComfoAirNumberEntityDescription(
         key="ewt_high_temperature",
-        name="EWT High Temperature",
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         native_min_value=-20,
         native_max_value=40,
@@ -159,7 +148,6 @@ _EWT_POSTHEAT_NUMBERS: tuple[ComfoAirNumberEntityDescription, ...] = (
     ),
     ComfoAirNumberEntityDescription(
         key="ewt_speed_up",
-        name="EWT Speed Up",
         native_unit_of_measurement=PERCENTAGE,
         native_min_value=0,
         native_max_value=100,
@@ -170,7 +158,6 @@ _EWT_POSTHEAT_NUMBERS: tuple[ComfoAirNumberEntityDescription, ...] = (
     ),
     ComfoAirNumberEntityDescription(
         key="kitchen_hood_speed_up",
-        name="Kitchen Hood Speed Up",
         native_unit_of_measurement=PERCENTAGE,
         native_min_value=0,
         native_max_value=100,
@@ -181,7 +168,6 @@ _EWT_POSTHEAT_NUMBERS: tuple[ComfoAirNumberEntityDescription, ...] = (
     ),
     ComfoAirNumberEntityDescription(
         key="postheating_target_temperature",
-        name="Post-Heating Target Temperature",
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         native_min_value=MIN_TEMPERATURE,
         native_max_value=MAX_TEMPERATURE,

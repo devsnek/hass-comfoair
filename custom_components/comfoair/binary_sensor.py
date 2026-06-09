@@ -27,43 +27,30 @@ class ComfoAirBinarySensorEntityDescription(BinarySensorEntityDescription):
 
 
 SENSORS: tuple[ComfoAirBinarySensorEntityDescription, ...] = (
-    ComfoAirBinarySensorEntityDescription(
-        key="supply_fan_active", name="Supply Fan Active"
-    ),
+    ComfoAirBinarySensorEntityDescription(key="supply_fan_active"),
     ComfoAirBinarySensorEntityDescription(
         key="frost_protection_active",
-        name="Frost Protection Active",
         feature=FEATURE_PREHEATING,
     ),
     ComfoAirBinarySensorEntityDescription(
-        key="summer_mode", name="Summer Mode", feature=FEATURE_BYPASS
+        key="summer_mode", feature=FEATURE_BYPASS
     ),
     ComfoAirBinarySensorEntityDescription(
-        key="bypass_valve_open", name="Bypass Valve Open", feature=FEATURE_BYPASS
+        key="bypass_valve_open", feature=FEATURE_BYPASS
     ),
     ComfoAirBinarySensorEntityDescription(
         key="preheating_state",
-        name="Preheating State",
         feature=FEATURE_PREHEATING,
     ),
     # physical switch inputs (0x03 Eingänge)
-    ComfoAirBinarySensorEntityDescription(key="step_switch_l1", name="Step Switch L1"),
-    ComfoAirBinarySensorEntityDescription(key="step_switch_l2", name="Step Switch L2"),
-    ComfoAirBinarySensorEntityDescription(
-        key="bathroom_switch", name="Bathroom Switch"
-    ),
-    ComfoAirBinarySensorEntityDescription(
-        key="bathroom_switch_2", name="Bathroom Switch 2"
-    ),
-    ComfoAirBinarySensorEntityDescription(
-        key="external_filter_switch", name="External Filter Switch"
-    ),
-    ComfoAirBinarySensorEntityDescription(
-        key="heat_recovery_switch", name="Heat Recovery Switch"
-    ),
+    ComfoAirBinarySensorEntityDescription(key="step_switch_l1"),
+    ComfoAirBinarySensorEntityDescription(key="step_switch_l2"),
+    ComfoAirBinarySensorEntityDescription(key="bathroom_switch"),
+    ComfoAirBinarySensorEntityDescription(key="bathroom_switch_2"),
+    ComfoAirBinarySensorEntityDescription(key="external_filter_switch"),
+    ComfoAirBinarySensorEntityDescription(key="heat_recovery_switch"),
     ComfoAirBinarySensorEntityDescription(
         key="kitchen_hood_switch",
-        name="Kitchen Hood Switch",
         feature=FEATURE_KITCHEN_HOOD,
     ),
 )

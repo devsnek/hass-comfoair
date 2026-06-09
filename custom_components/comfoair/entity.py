@@ -18,6 +18,10 @@ class ComfoAirEntity(CoordinatorEntity[ComfoAirCoordinator]):
         super().__init__(coordinator)
         self._key = key
         self._attr_unique_id = f"{coordinator.entry.entry_id}_{key}"
+        # Default the name translation key to the entity key so names are
+        # localized via translations/<lang>.json; subclasses may override.
+        if not hasattr(self, "_attr_translation_key"):
+            self._attr_translation_key = key
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, coordinator.entry.entry_id)},
             name=coordinator.device_name,

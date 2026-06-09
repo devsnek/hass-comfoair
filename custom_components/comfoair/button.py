@@ -23,12 +23,10 @@ class ComfoAirButtonEntityDescription(ButtonEntityDescription):
 BUTTONS: tuple[ComfoAirButtonEntityDescription, ...] = (
     ComfoAirButtonEntityDescription(
         key="filter_reset",
-        name="Filter Reset",
         action=lambda c: c.async_reset_filter(),
     ),
     ComfoAirButtonEntityDescription(
         key="error_reset",
-        name="Error Reset",
         action=lambda c: c.async_reset_errors(),
     ),
 )
