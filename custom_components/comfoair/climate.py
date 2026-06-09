@@ -87,6 +87,8 @@ class ComfoAirClimate(ComfoAirEntity, ClimateEntity):
     @property
     def fan_mode(self) -> str | None:
         raw = self.coordinator.data.get("current_level_raw")
+        if raw is None:
+            return None
         return _LEVEL_TO_FAN.get(raw)
 
     @property

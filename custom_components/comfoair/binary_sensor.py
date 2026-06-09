@@ -32,9 +32,7 @@ SENSORS: tuple[ComfoAirBinarySensorEntityDescription, ...] = (
         key="frost_protection_active",
         feature=FEATURE_PREHEATING,
     ),
-    ComfoAirBinarySensorEntityDescription(
-        key="summer_mode", feature=FEATURE_BYPASS
-    ),
+    ComfoAirBinarySensorEntityDescription(key="summer_mode", feature=FEATURE_BYPASS),
     ComfoAirBinarySensorEntityDescription(
         key="bypass_valve_open", feature=FEATURE_BYPASS
     ),

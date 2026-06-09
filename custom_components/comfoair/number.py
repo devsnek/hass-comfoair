@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable
+from typing import Callable, Any
 
 from homeassistant.components.number import (
     NumberEntity,
@@ -57,7 +57,7 @@ _FAN_NUMBERS: tuple[ComfoAirNumberEntityDescription, ...] = tuple(
     for key in _FAN_LEVELS
 )
 
-_MIN = dict(
+_MIN: Any = dict(
     native_unit_of_measurement=UnitOfTime.MINUTES,
     native_step=1,
     mode=NumberMode.BOX,

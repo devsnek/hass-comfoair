@@ -3,6 +3,7 @@
   "name": "ComfoAir Ventilation",
   "codeowners": ["@devsnek"],
   "config_flow": true,
+  "dependencies": ["usb"],
   "documentation": "https://github.com/devsnek/hass-comfoair",
   "integration_type": "device",
   "iot_class": "local_polling",

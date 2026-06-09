@@ -55,7 +55,7 @@ class ComfoAirTransport:
             self._reader_task.cancel()
             try:
                 await self._reader_task
-            except (asyncio.CancelledError, Exception):  # noqa: BLE001
+            except asyncio.CancelledError, Exception:  # noqa: BLE001
                 pass
         self._reader_task = None
         if self._writer is not None:

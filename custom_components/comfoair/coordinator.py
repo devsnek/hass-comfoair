@@ -187,8 +187,8 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.connector_board_name = (
             d[2:12].rstrip(b"\x00").decode("ascii", errors="replace")
         )
-        self.cc_ease_version = f"{d[12] >> 4}.{d[12] & 0x0f:02d}" if d[12] else None
-        self.cc_luxe_version = f"{d[13] >> 4}.{d[13] & 0x0f:02d}" if d[13] else None
+        self.cc_ease_version = f"{d[12] >> 4}.{d[12] & 0x0F:02d}" if d[12] else None
+        self.cc_luxe_version = f"{d[13] >> 4}.{d[13] & 0x0F:02d}" if d[13] else None
 
     def _parse_status(self, d: bytes) -> None:
         # Some firmware sends shorter 0xD6 frames than the full layout, and the

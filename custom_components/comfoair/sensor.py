@@ -1,7 +1,7 @@
 """Sensor platform for ComfoAir."""
 
 from __future__ import annotations
-
+from typing import Any
 from dataclasses import dataclass
 
 from homeassistant.components.sensor import (
@@ -38,26 +38,26 @@ class ComfoAirSensorEntityDescription(SensorEntityDescription):
     feature: str | None = None
 
 
-_TEMP = dict(
+_TEMP: Any = dict(
     device_class=SensorDeviceClass.TEMPERATURE,
     native_unit_of_measurement=UnitOfTemperature.CELSIUS,
     state_class=SensorStateClass.MEASUREMENT,
     suggested_display_precision=1,
 )
-_PCT = dict(
+_PCT: Any = dict(
     native_unit_of_measurement=PERCENTAGE,
     state_class=SensorStateClass.MEASUREMENT,
 )
-_RPM = dict(
+_RPM: Any = dict(
     native_unit_of_measurement=REVOLUTIONS_PER_MINUTE,
     state_class=SensorStateClass.MEASUREMENT,
 )
-_HOURS = dict(
+_HOURS: Any = dict(
     native_unit_of_measurement=UnitOfTime.HOURS,
     device_class=SensorDeviceClass.DURATION,
     state_class=SensorStateClass.TOTAL_INCREASING,
 )
-_MINUTES = dict(
+_MINUTES: Any = dict(
     native_unit_of_measurement=UnitOfTime.MINUTES,
     device_class=SensorDeviceClass.DURATION,
     state_class=SensorStateClass.MEASUREMENT,
@@ -95,9 +95,7 @@ SENSORS: tuple[ComfoAirSensorEntityDescription, ...] = (
     ComfoAirSensorEntityDescription(key="second_last_errors"),
     ComfoAirSensorEntityDescription(key="third_last_errors"),
     # bypass (optional)
-    ComfoAirSensorEntityDescription(
-        key="bypass_valve", **_PCT, feature=FEATURE_BYPASS
-    ),
+    ComfoAirSensorEntityDescription(key="bypass_valve", **_PCT, feature=FEATURE_BYPASS),
     ComfoAirSensorEntityDescription(key="bypass_factor", feature=FEATURE_BYPASS),
     ComfoAirSensorEntityDescription(key="bypass_step", feature=FEATURE_BYPASS),
     ComfoAirSensorEntityDescription(key="bypass_correction", feature=FEATURE_BYPASS),
@@ -128,9 +126,7 @@ SENSORS: tuple[ComfoAirSensorEntityDescription, ...] = (
         **_MINUTES,
         feature=FEATURE_PREHEATING,
     ),
-    ComfoAirSensorEntityDescription(
-        key="preheating_valve", feature=FEATURE_PREHEATING
-    ),
+    ComfoAirSensorEntityDescription(key="preheating_valve", feature=FEATURE_PREHEATING),
     ComfoAirSensorEntityDescription(
         key="frost_protection_level",
         feature=FEATURE_PREHEATING,
