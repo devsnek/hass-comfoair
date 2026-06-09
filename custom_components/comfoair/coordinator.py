@@ -21,6 +21,10 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from . import protocol as p
 from .const import (
     DOMAIN,
+    FAN_BALANCE_BALANCED,
+    FAN_BALANCE_EXHAUST_ONLY,
+    FAN_BALANCE_OPTIONS,
+    FAN_BALANCE_SUPPLY_ONLY,
     FEATURE_BYPASS,
     FEATURE_ENTHALPY,
     FEATURE_EWT,
@@ -38,6 +42,32 @@ _LOGGER = logging.getLogger(__name__)
 
 POLL_INTERVAL = timedelta(seconds=5)
 PROBE_TIMEOUT = 3.0
+
+# Per-level fan percentage keys, grouped by fan. "return_air_*" is the
+# exhaust/extract fan, "supply_air_*" is the supply/intake fan.
+_EXHAUST_LEVEL_KEYS = (
+    "return_air_level_absent",
+    "return_air_level_low",
+    "return_air_level_medium",
+    "return_air_level_high",
+)
+_SUPPLY_LEVEL_KEYS = (
+    "supply_air_level_absent",
+    "supply_air_level_low",
+    "supply_air_level_medium",
+    "supply_air_level_high",
+)
+# Byte order of the per-level percentages in CMD_SET_VENTILATION_LEVEL (0xCF).
+_FAN_LEVEL_ORDER = (
+    "return_air_level_absent",
+    "return_air_level_low",
+    "return_air_level_medium",
+    "supply_air_level_absent",
+    "supply_air_level_low",
+    "supply_air_level_medium",
+    "return_air_level_high",
+    "supply_air_level_high",
+)
 
 
 class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
@@ -81,6 +111,9 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             FEATURE_EWT: False,
         }
         self._state: dict[str, Any] = {}
+        # Last known non-zero per-level fan percentages, used by the Fan Balance
+        # select to restore "balanced" after a side was zeroed to stop a fan.
+        self._fan_baseline: dict[str, int] = {}
         self.transport.add_callback(self.on_frame)
 
     # ---- frame dispatch ------------------------------------------------------
@@ -232,6 +265,17 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         s["supply_fan_active"] = d[9] == 1
         s["return_air_level_high"] = d[10]
         s["supply_air_level_high"] = d[11]
+
+        # Remember the last non-zero percentage per level/side so the Fan
+        # Balance select can restore "balanced" after a side was zeroed. A
+        # zeroed side is intentionally not recorded.
+        baseline = getattr(self, "_fan_baseline", None)
+        if baseline is None:
+            baseline = self._fan_baseline = {}
+        for key in (*_EXHAUST_LEVEL_KEYS, *_SUPPLY_LEVEL_KEYS):
+            v = s.get(key)
+            if v:
+                baseline[key] = int(v)
 
     def _parse_temps(self, d: bytes) -> None:
         s = self._state
@@ -453,6 +497,67 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             values.append(max(15, min(95, int(v))))
         data = bytes(values + [0x00])
         await self.transport.send(p.CMD_SET_VENTILATION_LEVEL, data)
+        await self.transport.send(p.CMD_GET_VENTILATION_LEVEL)
+
+    @property
+    def fan_balance(self) -> str:
+        """Current fan balance, derived from the per-level percentages.
+
+        A fan is considered off when its low/medium/high percentages are all 0.
+        """
+
+        def all_off(keys: tuple[str, ...]) -> bool:
+            vals = [self._state.get(k) for k in keys if not k.endswith("_absent")]
+            if not any(v is not None for v in vals):
+                return False
+            return all(v == 0 for v in vals)
+
+        supply_off = all_off(_SUPPLY_LEVEL_KEYS)
+        exhaust_off = all_off(_EXHAUST_LEVEL_KEYS)
+        if supply_off and not exhaust_off:
+            return FAN_BALANCE_EXHAUST_ONLY
+        if exhaust_off and not supply_off:
+            return FAN_BALANCE_SUPPLY_ONLY
+        return FAN_BALANCE_BALANCED
+
+    async def async_set_fan_balance(self, mode: str) -> None:
+        """Run both fans, supply only, or exhaust only.
+
+        Implemented by rewriting the per-level airflow table via
+        CMD_SET_VENTILATION_LEVEL (0xCF): the disabled side's percentages are
+        set to 0, the enabled side is restored from the remembered baseline
+        (the last non-zero values seen on 0xCE frames). Unlike
+        async_set_fan_percentages this does NOT clamp to the 15..95 range,
+        because 0 is required to stop a fan.
+
+        CAVEAT: the ComfoAir enforces a ~15% minimum fan setpoint when
+        configured through the CC-Ease panel. Writing 0% over the serial link
+        is outside that official range; most CA350 firmwares accept it (it is
+        how "extract only" operation is achieved), but some may clamp it to the
+        minimum or ignore it, in which case the fan keeps running at ~15%.
+        """
+        if mode not in FAN_BALANCE_OPTIONS:
+            raise ValueError(f"invalid fan balance mode: {mode}")
+
+        values: dict[str, int | None] = {}
+        for key in (*_EXHAUST_LEVEL_KEYS, *_SUPPLY_LEVEL_KEYS):
+            base = self._fan_baseline.get(key)
+            values[key] = base if base is not None else self._state.get(key)
+
+        if mode == FAN_BALANCE_SUPPLY_ONLY:  # supply (in) only -> exhaust off
+            for key in _EXHAUST_LEVEL_KEYS:
+                values[key] = 0
+        elif mode == FAN_BALANCE_EXHAUST_ONLY:  # exhaust (out) only -> supply off
+            for key in _SUPPLY_LEVEL_KEYS:
+                values[key] = 0
+
+        payload: list[int] = []
+        for key in _FAN_LEVEL_ORDER:
+            v = values.get(key)
+            if v is None:
+                raise ValueError(f"fan percentage {key} not yet known")
+            payload.append(int(v) & 0xFF)
+        await self.transport.send(p.CMD_SET_VENTILATION_LEVEL, bytes(payload + [0x00]))
         await self.transport.send(p.CMD_GET_VENTILATION_LEVEL)
 
     async def async_set_time_delays(self, **overrides: int) -> None:

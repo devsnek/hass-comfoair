@@ -356,3 +356,92 @@ async def test_async_set_fan_percentages_clamps_and_requires_known_values() -> N
     cmd, data = fake.sent[0]
     assert cmd == p.CMD_SET_VENTILATION_LEVEL
     assert data == bytes([15, 30, 40, 50, 60, 70, 95, 80, 0x00])
+
+
+# --- fan balance --------------------------------------------------------------
+
+
+def _seed_balanced(coord: ComfoAirCoordinator) -> None:
+    coord._fan_baseline = {
+        "return_air_level_absent": 15,
+        "return_air_level_low": 30,
+        "return_air_level_medium": 50,
+        "return_air_level_high": 70,
+        "supply_air_level_absent": 15,
+        "supply_air_level_low": 30,
+        "supply_air_level_medium": 50,
+        "supply_air_level_high": 70,
+    }
+
+
+async def test_async_set_fan_balance_balanced_restores_both_sides() -> None:
+    coord = make_coordinator()
+    _seed_balanced(coord)
+    fake = FakeTransport()
+    coord.transport = cast(ComfoAirTransport, fake)
+    await coord.async_set_fan_balance("balanced")
+    cmd, data = fake.sent[0]
+    assert cmd == p.CMD_SET_VENTILATION_LEVEL
+    # order: exhaust a/l/m, supply a/l/m, exhaust high, supply high, trailing 0
+    assert data == bytes([15, 30, 50, 15, 30, 50, 70, 70, 0x00])
+
+
+async def test_async_set_fan_balance_supply_only_zeroes_exhaust() -> None:
+    coord = make_coordinator()
+    _seed_balanced(coord)
+    fake = FakeTransport()
+    coord.transport = cast(ComfoAirTransport, fake)
+    await coord.async_set_fan_balance("supply_only")
+    _cmd, data = fake.sent[0]
+    assert data == bytes([0, 0, 0, 15, 30, 50, 0, 70, 0x00])
+
+
+async def test_async_set_fan_balance_exhaust_only_zeroes_supply() -> None:
+    coord = make_coordinator()
+    _seed_balanced(coord)
+    fake = FakeTransport()
+    coord.transport = cast(ComfoAirTransport, fake)
+    await coord.async_set_fan_balance("exhaust_only")
+    _cmd, data = fake.sent[0]
+    assert data == bytes([15, 30, 50, 0, 0, 0, 70, 0, 0x00])
+
+
+async def test_async_set_fan_balance_invalid_mode_raises() -> None:
+    coord = make_coordinator()
+    coord._fan_baseline = {}
+    with pytest.raises(ValueError):
+        await coord.async_set_fan_balance("nonsense")
+
+
+def test_fan_balance_property() -> None:
+    coord = make_coordinator()
+    # balanced: both sides non-zero
+    coord._state.update(
+        {
+            "return_air_level_low": 30, "return_air_level_medium": 50, "return_air_level_high": 70,
+            "supply_air_level_low": 30, "supply_air_level_medium": 50, "supply_air_level_high": 70,
+        }
+    )
+    assert coord.fan_balance == "balanced"
+    # supply off -> exhaust only
+    coord._state.update(
+        {"supply_air_level_low": 0, "supply_air_level_medium": 0, "supply_air_level_high": 0}
+    )
+    assert coord.fan_balance == "exhaust_only"
+    # exhaust off too would be both off; restore supply, zero exhaust -> supply only
+    coord._state.update(
+        {
+            "supply_air_level_low": 30, "supply_air_level_medium": 50, "supply_air_level_high": 70,
+            "return_air_level_low": 0, "return_air_level_medium": 0, "return_air_level_high": 0,
+        }
+    )
+    assert coord.fan_balance == "supply_only"
+
+
+def test_parse_level_updates_fan_baseline() -> None:
+    coord = make_coordinator()
+    coord._fan_baseline = {}
+    data = bytes([15, 30, 50, 15, 30, 50, 30, 30, 2, 1, 70, 70])
+    coord._parse_level(data)
+    assert coord._fan_baseline["supply_air_level_high"] == 70
+    assert coord._fan_baseline["return_air_level_low"] == 30

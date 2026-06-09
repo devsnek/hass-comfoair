@@ -16,6 +16,17 @@ LEVEL_LOW = 0x02
 LEVEL_MEDIUM = 0x03
 LEVEL_HIGH = 0x04
 
+# Fan balance modes (select). Implemented by zeroing one fan's per-level
+# percentages via CMD_SET_VENTILATION_LEVEL (the disabled side is set to 0).
+FAN_BALANCE_BALANCED = "balanced"
+FAN_BALANCE_SUPPLY_ONLY = "supply_only"
+FAN_BALANCE_EXHAUST_ONLY = "exhaust_only"
+FAN_BALANCE_OPTIONS = (
+    FAN_BALANCE_BALANCED,
+    FAN_BALANCE_SUPPLY_ONLY,
+    FAN_BALANCE_EXHAUST_ONLY,
+)
+
 # Feature flags discovered from RES_GET_STATUS
 FEATURE_PREHEATING = "preheating"
 FEATURE_BYPASS = "bypass"

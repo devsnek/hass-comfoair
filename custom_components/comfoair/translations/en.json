@@ -110,6 +110,16 @@
     "button": {
       "filter_reset": { "name": "Filter Reset" },
       "error_reset": { "name": "Error Reset" }
+    },
+    "select": {
+      "fan_balance": {
+        "name": "Fan Balance",
+        "state": {
+          "balanced": "Balanced",
+          "supply_only": "Supply only",
+          "exhaust_only": "Exhaust only"
+        }
+      }
     }
   }
 }
