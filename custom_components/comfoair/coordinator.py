@@ -168,6 +168,8 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 await self.transport.connect()
             for cmd in self._poll_commands():
                 await self.transport.send(cmd)
+            # key status with nothing pressed just to get display status
+            await self.async_key_status()
         except (ConnectionError, asyncio.TimeoutError) as err:
             raise UpdateFailed(str(err)) from err
         return dict(self._state)
@@ -363,6 +365,45 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         s["postheating_power_i"] = d[5]
         s["postheating_target_temperature"] = p.byte_to_temp(d[6])
 
+    def _parse_cc_ease_display(self, d: bytes) -> None:
+        """Decode a CC-Ease LCD frame (0x3C)."""
+        if len(d) < 10:
+            return
+        s = self._state
+
+        s["cc_ease_weekday"] = next(
+            (name for i, name in enumerate(p.CC_EASE_WEEKDAYS) if d[0] & (1 << i)),
+            None,
+        )
+        s["cc_ease_colon"] = bool(d[0] & 0x80)
+
+        text = p.CC_EASE_LEADING_DIGIT.get(d[1] & 0x07, "?") + "".join(
+            p.CC_EASE_SEVEN_SEGMENT.get(b & 0x7F, "?") for b in d[2:9]
+        )
+        s["cc_ease_text"] = text
+        s["cc_ease_dot"] = bool(d[8] & 0x80)
+
+        s["cc_ease_symbol_auto"] = bool(d[1] & 0x08)
+        s["cc_ease_symbol_manual"] = bool(d[1] & 0x10)
+        s["cc_ease_symbol_filter"] = bool(d[1] & 0x20)
+        s["cc_ease_symbol_supply"] = bool(d[1] & 0x40)
+        s["cc_ease_symbol_exhaust"] = bool(d[1] & 0x80)
+        s["cc_ease_symbol_fan"] = bool(d[2] & 0x80)
+        s["cc_ease_symbol_kitchen_hood"] = bool(d[3] & 0x80)
+        s["cc_ease_symbol_preheating"] = bool(d[4] & 0x80)
+        s["cc_ease_symbol_frost"] = bool(d[5] & 0x80)
+        s["cc_ease_symbol_ewt"] = bool(d[6] & 0x80)
+        s["cc_ease_symbol_postheating"] = bool(d[7] & 0x80)
+
+        s["cc_ease_symbol_degree"] = bool(d[9] & 0x01)
+        s["cc_ease_symbol_bypass"] = bool(d[9] & 0x02)
+        s["cc_ease_bar_1"] = bool(d[9] & 0x04)
+        s["cc_ease_bar_2"] = bool(d[9] & 0x08)
+        s["cc_ease_bar_3"] = bool(d[9] & 0x10)
+        s["cc_ease_symbol_house"] = bool(d[9] & 0x20)
+        s["cc_ease_symbol_supply_air"] = bool(d[9] & 0x40)
+        s["cc_ease_symbol_exhaust_air"] = bool(d[9] & 0x80)
+
     # ---- writes --------------------------------------------------------------
 
     async def async_set_level(self, level: int) -> None:
@@ -469,6 +510,12 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         await self.transport.send(p.CMD_SET_EWT_POSTHEATING, bytes(values))
         await self.transport.send(p.CMD_GET_EWT_POSTHEATING)
 
+    async def async_key_status(
+        self, fan=0, mode=0, clock=0, temperature=0, plus=0, minus=0
+    ):
+        values = map(p.ms_to_byte, [fan, mode, clock, temperature, plus, minus, 0])
+        await self.transport.send(p.CMD_CC_EASE_KEY_STATUS, bytes(values))
+
 
 def _get_byte(d: bytes, i: int) -> int | None:
     """Return d[i], or None if the frame is shorter than expected."""
@@ -513,4 +560,5 @@ _PARSERS: dict[int, Callable[[ComfoAirCoordinator, bytes], None]] = {
     p.RES_GET_EWT_POSTHEATING: ComfoAirCoordinator._parse_ewt_postheating,
     p.RES_GET_INPUTS: ComfoAirCoordinator._parse_inputs,
     p.RES_GET_ANALOG_INPUTS: ComfoAirCoordinator._parse_analog_inputs,
+    p.CMD_CC_EASE_SET_DISPLAY: ComfoAirCoordinator._parse_cc_ease_display,
 }

@@ -185,6 +185,110 @@ def test_parse_status_tolerates_short_frame() -> None:
     assert coord.features[FEATURE_EWT] is False
 
 
+# --- _parse_cc_ease_display (0x3C) --------------------------------------------
+
+
+def test_parse_cc_ease_display_decodes_text_weekday_and_colon() -> None:
+    coord = make_coordinator()
+    data = bytes(
+        [
+            0x04 | 0x80,  # d[0]: weekday Monday (bit 2) + colon (bit 7)
+            0x06,  # d[1]: leading digit "1", no symbol bits
+            0x5B,  # d[2]: "2"
+            0x4F,  # d[3]: "3"
+            0x66,  # d[4]: "4"
+            0x6D,  # d[5]: "5"
+            0x7D,  # d[6]: "6"
+            0x07,  # d[7]: "7"
+            0x00,  # d[8]: " ", dot bit clear
+            0x00,  # d[9]: no flags
+        ]
+    )
+    coord._parse_cc_ease_display(data)
+    s = coord._state
+    assert s["cc_ease_weekday"] == "Monday"
+    assert s["cc_ease_colon"] is True
+    assert s["cc_ease_text"] == "1234567 "
+    assert s["cc_ease_dot"] is False
+    # No symbol bits anywhere -> every symbol/bar is off.
+    assert all(v is False for k, v in s.items() if k.startswith("cc_ease_symbol_"))
+    assert s["cc_ease_bar_1"] is False
+
+
+def test_parse_cc_ease_display_decodes_all_symbol_bits() -> None:
+    coord = make_coordinator()
+    data = bytes(
+        [
+            0x80,  # d[0]: colon only, no weekday bit set
+            0x06
+            | 0x08
+            | 0x10
+            | 0x20
+            | 0x40
+            | 0x80,  # leading "1" + auto/manual/filter/supply/exhaust
+            0x80,  # d[2]: fan symbol (segment " ")
+            0x80,  # d[3]: kitchen hood
+            0x80,  # d[4]: preheating
+            0x80,  # d[5]: frost
+            0x80,  # d[6]: ewt
+            0x80,  # d[7]: postheating
+            0x80,  # d[8]: dot (segment " ")
+            0xFF,  # d[9]: degree, bypass, bars 1-3, house, supply_air, exhaust_air
+        ]
+    )
+    coord._parse_cc_ease_display(data)
+    s = coord._state
+    assert s["cc_ease_weekday"] is None  # no weekday bit set
+    assert s["cc_ease_colon"] is True
+    assert s["cc_ease_text"] == "1       "
+    assert s["cc_ease_dot"] is True
+    assert s["cc_ease_symbol_auto"] is True
+    assert s["cc_ease_symbol_manual"] is True
+    assert s["cc_ease_symbol_filter"] is True
+    assert s["cc_ease_symbol_supply"] is True
+    assert s["cc_ease_symbol_exhaust"] is True
+    assert s["cc_ease_symbol_fan"] is True
+    assert s["cc_ease_symbol_kitchen_hood"] is True
+    assert s["cc_ease_symbol_preheating"] is True
+    assert s["cc_ease_symbol_frost"] is True
+    assert s["cc_ease_symbol_ewt"] is True
+    assert s["cc_ease_symbol_postheating"] is True
+    assert s["cc_ease_symbol_degree"] is True
+    assert s["cc_ease_symbol_bypass"] is True
+    assert s["cc_ease_bar_1"] is True
+    assert s["cc_ease_bar_2"] is True
+    assert s["cc_ease_bar_3"] is True
+    assert s["cc_ease_symbol_house"] is True
+    assert s["cc_ease_symbol_supply_air"] is True
+    assert s["cc_ease_symbol_exhaust_air"] is True
+
+
+def test_parse_cc_ease_display_unknown_segments_fall_back_to_question_mark() -> None:
+    coord = make_coordinator()
+    data = bytes(
+        [
+            0x00,  # no weekday, no colon
+            0x01,  # leading digit 0x01 not in lookup -> "?"
+            0x01,  # d[2]: 0x01 not a valid seven-segment -> "?"
+            0x3F,  # "0"
+            0x00,  # " "
+            0x00,  # " "
+            0x00,  # " "
+            0x00,  # " "
+            0x00,  # " "
+            0x00,
+        ]
+    )
+    coord._parse_cc_ease_display(data)
+    assert coord._state["cc_ease_text"] == "??0     "
+
+
+def test_parse_cc_ease_display_short_frame_is_ignored() -> None:
+    coord = make_coordinator()
+    coord._parse_cc_ease_display(bytes(9))  # needs >= 10 bytes
+    assert coord._state == {}
+
+
 # --- write-path validation ----------------------------------------------------
 
 

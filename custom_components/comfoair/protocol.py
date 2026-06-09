@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Iterator
+from math import ceil
 
 PREFIX = 0x07
 HEAD = 0xF0
@@ -65,6 +66,9 @@ CMD_SET_COMFORT_TEMPERATURE = 0xD3
 CMD_SET_TIME_DELAY = 0xCB
 CMD_RESET_AND_SELF_TEST = 0xDB
 CMD_SET_EWT_POSTHEATING = 0xED
+
+CMD_CC_EASE_KEY_STATUS = 0x37
+CMD_CC_EASE_SET_DISPLAY = 0x3C
 
 
 # --- frame data structure -----------------------------------------------------
@@ -268,3 +272,50 @@ def u16(data: bytes, offset: int) -> int:
 
 def u24(data: bytes, offset: int) -> int:
     return (data[offset] << 16) | (data[offset + 1] << 8) | data[offset + 2]
+
+
+def ms_to_byte(ms: int) -> int:
+    """Encode milliseconds."""
+    ms = min(ms, 4080)
+    return ceil(ms / 16.0)
+
+
+CC_EASE_LEADING_DIGIT: dict[int, str] = {0x00: " ", 0x03: "2", 0x06: "1"}
+CC_EASE_SEVEN_SEGMENT: dict[int, str] = {
+    0x00: " ",
+    0x3F: "0",
+    0x06: "1",
+    0x5B: "2",
+    0x4F: "3",
+    0x66: "4",
+    0x6D: "5",
+    0x7D: "6",
+    0x07: "7",
+    0x7F: "8",
+    0x6F: "9",
+    0x77: "A",
+    0x7C: "b",
+    0x39: "C",
+    0x5E: "d",
+    0x79: "E",
+    0x71: "F",
+    0x76: "H",
+    0x38: "L",
+    0x54: "n",
+    0x5C: "o",
+    0x73: "P",
+    0x50: "r",
+    0x78: "t",
+    0x3E: "U",
+    0x40: "-",
+}
+
+CC_EASE_WEEKDAYS = (
+    "Saturday",
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+)
