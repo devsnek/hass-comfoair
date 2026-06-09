@@ -146,11 +146,14 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             p.CMD_GET_VALVE_STATUS,
             p.CMD_GET_INPUTS,
             p.CMD_GET_ANALOG_INPUTS,
+            # Always poll bypass/preheating rather than gating on feature
+            # detection: the status frame's feature bits are unreliable on some
+            # firmware, and a unit that doesn't have the module simply ignores
+            # the read. This keeps summer_mode/bypass flowing even when
+            # detection missed them. Entity creation stays feature-gated.
+            p.CMD_GET_BYPASS_CONTROL_STATUS,
+            p.CMD_GET_PREHEATING_STATUS,
         ]
-        if self.features[FEATURE_BYPASS]:
-            cmds.append(p.CMD_GET_BYPASS_CONTROL_STATUS)
-        if self.features[FEATURE_PREHEATING]:
-            cmds.append(p.CMD_GET_PREHEATING_STATUS)
         if self.features[FEATURE_ENTHALPY]:
             cmds.append(p.CMD_GET_SENSOR_DATA)
         if self.features[FEATURE_EWT] or self.features[FEATURE_POSTHEATING]:
@@ -188,14 +191,21 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.cc_luxe_version = f"{d[13] >> 4}.{d[13] & 0x0f:02d}" if d[13] else None
 
     def _parse_status(self, d: bytes) -> None:
+        # Some firmware sends shorter 0xD6 frames than the full layout, and the
+        # device volunteers status frames unprompted. Bounds-check every byte
+        # and latch features *on* — never clear one we've already detected — so
+        # a short/partial frame can't silently stop us polling bypass or
+        # preheating and leave those entities stuck "unknown".
+        b4 = _get_byte(d, 4)
+        f = self.features
         self.features = {
-            FEATURE_PREHEATING: bool(d[0]),
-            FEATURE_BYPASS: bool(d[1]),
-            FEATURE_FIREPLACE: bool(d[4] & 0x01),
-            FEATURE_KITCHEN_HOOD: bool(d[4] & 0x02),
-            FEATURE_POSTHEATING: bool(d[4] & 0x04),
-            FEATURE_ENTHALPY: bool(d[9]),
-            FEATURE_EWT: bool(d[10]),
+            FEATURE_PREHEATING: f[FEATURE_PREHEATING] or bool(_get_byte(d, 0)),
+            FEATURE_BYPASS: f[FEATURE_BYPASS] or bool(_get_byte(d, 1)),
+            FEATURE_FIREPLACE: f[FEATURE_FIREPLACE] or bool(b4 and b4 & 0x01),
+            FEATURE_KITCHEN_HOOD: f[FEATURE_KITCHEN_HOOD] or bool(b4 and b4 & 0x02),
+            FEATURE_POSTHEATING: f[FEATURE_POSTHEATING] or bool(b4 and b4 & 0x04),
+            FEATURE_ENTHALPY: f[FEATURE_ENTHALPY] or bool(_get_byte(d, 9)),
+            FEATURE_EWT: f[FEATURE_EWT] or bool(_get_byte(d, 10)),
         }
 
     def _parse_fan(self, d: bytes) -> None:
@@ -291,11 +301,22 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         s["motor_current_preheating"] = d[3]
 
     def _parse_bypass(self, d: bytes) -> None:
+        # Bounds-check each byte: some firmware sends 0xE0 frames shorter than
+        # the full 7-byte layout. Reaching past the end used to raise
+        # IndexError, which on_frame swallowed, so summer_mode never updated.
         s = self._state
-        s["bypass_factor"] = d[2]
-        s["bypass_step"] = d[3]
-        s["bypass_correction"] = d[4]
-        s["summer_mode"] = d[6] != 0
+        factor = _get_byte(d, 2)
+        step = _get_byte(d, 3)
+        correction = _get_byte(d, 4)
+        summer = _get_byte(d, 6)
+        if factor is not None:
+            s["bypass_factor"] = factor
+        if step is not None:
+            s["bypass_step"] = step
+        if correction is not None:
+            s["bypass_correction"] = correction
+        if summer is not None:
+            s["summer_mode"] = summer != 0
 
     def _parse_preheating(self, d: bytes) -> None:
         s = self._state
@@ -447,6 +468,11 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 values.append(max(0, min(100, int(v))))
         await self.transport.send(p.CMD_SET_EWT_POSTHEATING, bytes(values))
         await self.transport.send(p.CMD_GET_EWT_POSTHEATING)
+
+
+def _get_byte(d: bytes, i: int) -> int | None:
+    """Return d[i], or None if the frame is shorter than expected."""
+    return d[i] if i < len(d) else None
 
 
 _A_HIGH_CODES = ("A9", "A10", "A11", "A12", "A13", "A14", "A15", "A0")

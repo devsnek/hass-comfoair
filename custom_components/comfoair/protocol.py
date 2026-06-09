@@ -110,21 +110,30 @@ def encode_frame(cmd: int, data: bytes = b"") -> bytes:
 class FrameParser:
     """Incrementally consume bytes and yield decoded frames.
 
-    Handles escape unwrapping (`0x07 0x07` -> single `0x07` in body) and ACK
-    frames (`0x07 0xF3`).
+    Only the data area is escaped: a literal 0x07 inside <data> is doubled
+    (0x07 0x07 -> 0x07). The <cmd> and <len> header bytes are sent raw, so a
+    frame whose length is 0x07 carries a single 0x07 length byte. We therefore
+    read <cmd> and <len> literally, then length-delimit the data region and
+    apply unescaping only there — a marker-based parser would mistake the raw
+    0x07 length byte for an escape prefix and drop the whole frame, which is
+    what left every 0xE0 (bypass/summer mode) and 0xEC (EWT) frame, both
+    length 7, unparsed. ACK frames are just `0x07 0xF3`.
     """
 
     # parser states
     _IDLE = 0  # waiting for PREFIX
     _AFTER_PREFIX = 1  # got PREFIX, expecting HEAD or ACK
     _AFTER_HEAD = 2  # got HEAD, expecting 0x00
-    _BODY = 3  # collecting cmd/len/data/checksum (with unescaping)
-    _BODY_ESCAPE = 4  # saw PREFIX inside body; next byte decides
-    _TAIL = 5  # saw PREFIX after a complete body; expecting TAIL
+    _CMD = 3  # next byte is the raw command byte
+    _LEN = 4  # next byte is the raw length byte
+    _DATA = 5  # collecting <len> data bytes + 1 checksum (with unescaping)
+    _DATA_ESCAPE = 6  # saw PREFIX inside the data region; next byte decides
+    _END_TAIL = 7  # data complete, saw end PREFIX, expecting TAIL
 
     def __init__(self) -> None:
         self._state = self._IDLE
         self._body = bytearray()
+        self._remaining = 0  # data + checksum bytes still to read
 
     def feed(self, chunk: bytes) -> Iterator[Frame]:
         for byte in chunk:
@@ -135,6 +144,13 @@ class FrameParser:
     def _reset(self) -> None:
         self._state = self._IDLE
         self._body.clear()
+        self._remaining = 0
+
+    def _resync(self, b: int) -> None:
+        """Drop the current frame; if b is a PREFIX, start a new one."""
+        self._reset()
+        if b == PREFIX:
+            self._state = self._AFTER_PREFIX
 
     def _step(self, b: int) -> Frame | None:
         st = self._state
@@ -151,39 +167,59 @@ class FrameParser:
                 self._state = self._AFTER_HEAD
                 return None
             # stray byte; resync (this byte might itself be a PREFIX)
-            self._reset()
-            if b == PREFIX:
-                self._state = self._AFTER_PREFIX
+            self._resync(b)
             return None
 
         if st == self._AFTER_HEAD:
             if b == 0x00:
-                self._state = self._BODY
+                self._state = self._CMD
             else:
-                self._reset()
+                self._resync(b)
             return None
 
-        if st == self._BODY:
+        if st == self._CMD:
+            self._body.append(b)
+            self._state = self._LEN
+            return None
+
+        if st == self._LEN:
+            self._body.append(b)
+            self._remaining = b + 1  # <len> data bytes + 1 checksum byte
+            self._state = self._DATA
+            return None
+
+        if st == self._DATA:
+            if self._remaining == 0:
+                # data + checksum complete; expect end marker 0x07 0x0F
+                if b == PREFIX:
+                    self._state = self._END_TAIL
+                else:
+                    self._resync(b)
+                return None
             if b == PREFIX:
-                self._state = self._BODY_ESCAPE
+                self._state = self._DATA_ESCAPE
                 return None
             self._body.append(b)
+            self._remaining -= 1
             return None
 
-        if st == self._BODY_ESCAPE:
+        if st == self._DATA_ESCAPE:
             if b == PREFIX:
-                # escaped prefix in body
+                # escaped literal 0x07 inside the data/checksum region
                 self._body.append(PREFIX)
-                self._state = self._BODY
+                self._remaining -= 1
+                self._state = self._DATA
                 return None
+            # a lone 0x07 in the data region is unexpected (truncated frame)
+            self._resync(b)
+            return None
+
+        if st == self._END_TAIL:
             if b == TAIL:
                 frame = self._finalize()
                 self._reset()
                 return frame
-            # unexpected; resync
-            self._reset()
-            if b == PREFIX:
-                self._state = self._AFTER_PREFIX
+            self._resync(b)
             return None
 
         return None
