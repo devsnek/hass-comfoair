@@ -10,6 +10,7 @@ from homeassistant.components.climate import (
     HVACMode,
 )
 from homeassistant.components.climate.const import (
+    FAN_AUTO,
     FAN_HIGH,
     FAN_LOW,
     FAN_MEDIUM,
@@ -26,6 +27,7 @@ from .const import (
     LEVEL_HIGH,
     LEVEL_LOW,
     LEVEL_MEDIUM,
+    LEVEL_AUTO,
     MAX_TEMPERATURE,
     MIN_TEMPERATURE,
 )
@@ -36,6 +38,7 @@ _FAN_TO_LEVEL = {
     FAN_LOW: LEVEL_LOW,
     FAN_MEDIUM: LEVEL_MEDIUM,
     FAN_HIGH: LEVEL_HIGH,
+    FAN_AUTO: LEVEL_AUTO,
 }
 
 _LEVEL_TO_FAN = {
@@ -43,6 +46,7 @@ _LEVEL_TO_FAN = {
     LEVEL_LOW: FAN_LOW,
     LEVEL_MEDIUM: FAN_MEDIUM,
     LEVEL_HIGH: FAN_HIGH,
+    LEVEL_AUTO: FAN_AUTO,
 }
 
 
@@ -65,7 +69,7 @@ class ComfoAirClimate(ComfoAirEntity, ClimateEntity):
     _attr_max_temp = MAX_TEMPERATURE
     _attr_target_temperature_step = 1
     _attr_hvac_modes = [HVACMode.FAN_ONLY, HVACMode.OFF]
-    _attr_fan_modes = [FAN_OFF, FAN_LOW, FAN_MEDIUM, FAN_HIGH]
+    _attr_fan_modes = [FAN_OFF, FAN_LOW, FAN_MEDIUM, FAN_HIGH, FAN_AUTO]
     _attr_supported_features = (
         ClimateEntityFeature.TARGET_TEMPERATURE | ClimateEntityFeature.FAN_MODE
     )

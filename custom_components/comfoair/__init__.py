@@ -42,9 +42,7 @@ def _migrate_unique_ids(hass: HomeAssistant, entry: ConfigEntry) -> None:
     for old_suffix, new_suffix in _UNIQUE_ID_MIGRATIONS.items():
         old_unique_id = f"{prefix}{old_suffix}"
         new_unique_id = f"{prefix}{new_suffix}"
-        entity_id = registry.async_get_entity_id(
-            Platform.SENSOR, DOMAIN, old_unique_id
-        )
+        entity_id = registry.async_get_entity_id(Platform.SENSOR, DOMAIN, old_unique_id)
         if entity_id is None:
             continue
         if registry.async_get_entity_id(Platform.SENSOR, DOMAIN, new_unique_id):
