@@ -269,7 +269,7 @@ const pt=t=>(e,i)=>{void 0!==i?i.addInitializer(()=>{customElements.define(t,e)}
 {
   const _ca = customElements.get('esphome-comfoair-card');
   if (_ca) {
-    const _VER = 'v0.16.3-hca.2';
+    const _VER = 'v0.16.3-hca.3';
 
     // ── i18n string table ─────────────────────────────────────────────────────
     const _STRINGS = {
@@ -481,7 +481,7 @@ const pt=t=>(e,i)=>{void 0!==i?i.addInitializer(()=>{customElements.define(t,e)}
         ]}}});
         if ('fixed' === t.color_scale) {
           schema.push(
-            { name: 'temp_min', selector: { number: { min: -30, max: 20, step: 1, unit_of_measurement: '°C', mode: 'box' } } },
+            { name: 'temp_min', selector: { number: { min: -20, max: 20, step: 1, unit_of_measurement: '°C', mode: 'box' } } },
             { name: 'temp_max', selector: { number: { min: 0,   max: 50, step: 1, unit_of_measurement: '°C', mode: 'box' } } },
           );
         }
@@ -517,6 +517,8 @@ const pt=t=>(e,i)=>{void 0!==i?i.addInitializer(()=>{customElements.define(t,e)}
         animation:              'animated',
         animation_speed_source: 'level',
         color_scale:            'auto',
+        temp_min:               -20,
+        temp_max:                50,
         show_legend:             true,
         tempSensor1:  'sensor.comfoair_outside_air_temperature',
         tempSensor2:  'sensor.comfoair_exhaust_air_temperature',
