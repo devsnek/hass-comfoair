@@ -27,34 +27,25 @@ PLATFORMS: list[Platform] = [
     Platform.NUMBER,
 ]
 
-CARD_URL = "/comfoair/comfoair-card.js"
-ESPHOME_CARD_URL = "/comfoair/esphome-comfoair-card.js"
+CARD_URL = "/comfoair/esphome-comfoair-card.js"
 _CARD_REGISTERED_KEY = "comfoair_card_registered"
 
 
 async def _async_register_card(hass: HomeAssistant) -> None:
-    """Serve the bundled Lovelace cards and load them in the frontend.
+    """Serve the bundled Lovelace card and load it in the frontend.
 
-    Both cards ship inside the integration, so installing the integration
+    The card ships inside the integration, so installing the integration
     (e.g. via HACS) is all that is needed — no manual copy to /config/www
     and no Lovelace resource registration.
-
-    ``comfoair-card`` is the original text-based card (``custom:comfoair-card``).
-    ``esphome-comfoair-card`` is the SVG heat-exchanger diagram card
-    (``custom:esphome-comfoair-card``).
     """
     if hass.data.get(_CARD_REGISTERED_KEY):
         return
     hass.data[_CARD_REGISTERED_KEY] = True
-    www = Path(__file__).parent / "www"
+    card_path = Path(__file__).parent / "www" / "esphome-comfoair-card.js"
     await hass.http.async_register_static_paths(
-        [
-            StaticPathConfig(CARD_URL, str(www / "comfoair-card.js"), cache_headers=False),
-            StaticPathConfig(ESPHOME_CARD_URL, str(www / "esphome-comfoair-card.js"), cache_headers=False),
-        ]
+        [StaticPathConfig(CARD_URL, str(card_path), cache_headers=False)]
     )
     add_extra_js_url(hass, CARD_URL)
-    add_extra_js_url(hass, ESPHOME_CARD_URL)
 
 
 _UNIQUE_ID_MIGRATIONS = {
