@@ -30,6 +30,9 @@ from .const import (
     FEATURE_PREHEATING,
     MAX_TEMPERATURE,
     MIN_TEMPERATURE,
+    FAN_BALANCE_BALANCED,
+    FAN_BALANCE_SUPPLY_ONLY,
+    FAN_BALANCE_EXHAUST_ONLY,
 )
 from .protocol import Frame
 from .transport import ComfoAirTransport
@@ -511,10 +514,58 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         await self.transport.send(p.CMD_GET_EWT_POSTHEATING)
 
     async def async_key_status(
-        self, fan=0, mode=0, clock=0, temperature=0, plus=0, minus=0
+        self,
+        fan=False,
+        mode=False,
+        clock=False,
+        temperature=False,
+        plus=False,
+        minus=False,
+        wait=False,
     ):
-        values = map(p.ms_to_byte, [fan, mode, clock, temperature, plus, minus, 0])
-        await self.transport.send(p.CMD_CC_EASE_KEY_STATUS, bytes(values))
+        values = map(
+            lambda p: 1 if p else 0, [fan, mode, clock, temperature, plus, minus, 0]
+        )
+        if wait:
+            await self.transport.request(
+                p.CMD_CC_EASE_KEY_STATUS, p.CMD_CC_EASE_SET_DISPLAY, bytes(values)
+            )
+        else:
+            await self.transport.send(p.CMD_CC_EASE_KEY_STATUS, bytes(values))
+
+    def fan_balance(self):
+        supply = self._state.get("cc_ease_symbol_supply_air")
+        exhaust = self._state.get("cc_ease_symbol_exhaust_air")
+        if exhaust and supply:
+            return FAN_BALANCE_BALANCED
+        if supply:
+            return FAN_BALANCE_SUPPLY_ONLY
+        if exhaust:
+            return FAN_BALANCE_EXHAUST_ONLY
+        return None
+
+    async def async_set_fan_balance(self, target: str):
+        await self.async_key_status(wait=True)
+        seen = set()
+        while True:
+            current = self.fan_balance()
+            if current == target:
+                break
+            if current is None:
+                _LOGGER.warning(
+                    "Attempted to set fan balance to %s but fan balance is unknown"
+                )
+                break
+            if current in seen:
+                _LOGGER.warning(
+                    "Attempted to set fan balance to %s but only found %s"
+                    % (target, seen)
+                )
+                break
+            seen.add(current)
+            await self.async_key_status(mode=True)
+            await asyncio.sleep(3)
+            await self.async_key_status(mode=False, wait=True)
 
 
 def _get_byte(d: bytes, i: int) -> int | None:
