@@ -9,10 +9,11 @@ DEFAULT_NAME = "ComfoAir"
 MIN_TEMPERATURE = 12.0
 MAX_TEMPERATURE = 29.0
 
-# Fan balance modes (select).  Implemented by zeroing one fan's per-level
-# percentages via CMD_SET_VENTILATION_LEVEL (the disabled side is set to 0).
-# State is read back from CC-Ease display symbols so the machine owns the
-# source of truth — not Home Assistant.
+# Fan balance modes (select).  Implemented by rewriting one fan's per-level
+# percentages via CMD_SET_VENTILATION_LEVEL: the disabled side is parked at its
+# absent floor.  State is read back from whichever source the unit exposes — the
+# always-polled ventilation-level table (0xCE, low vs absent) and, when a CC-Ease
+# panel is present, its 0x3C display icons — so it works with or without a panel.
 FAN_BALANCE_BALANCED = "balanced"
 FAN_BALANCE_SUPPLY_ONLY = "supply_only"
 FAN_BALANCE_EXHAUST_ONLY = "exhaust_only"

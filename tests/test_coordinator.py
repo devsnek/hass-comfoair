@@ -362,7 +362,7 @@ async def test_async_set_fan_percentages_clamps_and_requires_known_values() -> N
 
 
 # ---------------------------------------------------------------------------
-# Fan balance — CC-Ease symbol-based state read and write path
+# Fan balance — ventilation-level state read (0xCE) and write path
 # ---------------------------------------------------------------------------
 
 
@@ -380,28 +380,83 @@ def _seed_baseline(coord: ComfoAirCoordinator) -> None:
     }
 
 
-def test_fan_balance_property_reads_cc_ease_symbols() -> None:
-    """fan_balance derives state from CC-Ease display symbols, not fan percentages."""
+def test_fan_balance_property_reads_ventilation_level() -> None:
+    """fan_balance derives state from the 0xCE level table (low vs absent floor)."""
     coord = make_coordinator()
 
-    # Both symbols lit → balanced
-    coord._state["cc_ease_symbol_supply"] = True
-    coord._state["cc_ease_symbol_exhaust"] = True
+    # No level data yet → safe default (balanced)
     assert coord.fan_balance == FAN_BALANCE_BALANCED
 
-    # Supply symbol only → supply_only
-    coord._state["cc_ease_symbol_exhaust"] = False
+    # Both sides running above their absent floor → balanced
+    coord._state.update(
+        {
+            "return_air_level_absent": 15,
+            "return_air_level_low": 30,
+            "supply_air_level_absent": 15,
+            "supply_air_level_low": 30,
+        }
+    )
+    assert coord.fan_balance == FAN_BALANCE_BALANCED
+
+    # Exhaust (return) parked at its absent floor, supply running → supply_only
+    coord._state["return_air_level_low"] = 15
     assert coord.fan_balance == FAN_BALANCE_SUPPLY_ONLY
 
-    # Exhaust symbol only → exhaust_only
-    coord._state["cc_ease_symbol_supply"] = False
-    coord._state["cc_ease_symbol_exhaust"] = True
+    # Supply parked at its absent floor, exhaust running → exhaust_only
+    coord._state["return_air_level_low"] = 30
+    coord._state["supply_air_level_low"] = 15
     assert coord.fan_balance == FAN_BALANCE_EXHAUST_ONLY
 
-    # No CC-Ease data yet → safe default (balanced)
-    del coord._state["cc_ease_symbol_supply"]
-    del coord._state["cc_ease_symbol_exhaust"]
+    # Both sides parked → balanced (HA has no "off" balance option)
+    coord._state["return_air_level_low"] = 15
     assert coord.fan_balance == FAN_BALANCE_BALANCED
+
+
+def test_fan_balance_property_reads_cc_ease_display() -> None:
+    """With no level table, fan_balance falls back to the 0x3C In/Out icons."""
+    coord = make_coordinator()
+
+    # "In" (supply air) icon only → supply_only
+    coord._state["cc_ease_symbol_supply_air"] = True
+    coord._state["cc_ease_symbol_exhaust_air"] = False
+    assert coord.fan_balance == FAN_BALANCE_SUPPLY_ONLY
+
+    # "Out" (exhaust air) icon only → exhaust_only
+    coord._state["cc_ease_symbol_supply_air"] = False
+    coord._state["cc_ease_symbol_exhaust_air"] = True
+    assert coord.fan_balance == FAN_BALANCE_EXHAUST_ONLY
+
+    # Both icons lit → balanced
+    coord._state["cc_ease_symbol_supply_air"] = True
+    assert coord.fan_balance == FAN_BALANCE_BALANCED
+
+
+def test_fan_balance_property_combines_both_sources() -> None:
+    """A side parked in *either* source is reported off (OR semantics)."""
+    coord = make_coordinator()
+    # 0xCE says balanced, but the CC-Ease display shows exhaust-only ("Out").
+    coord._state.update(
+        {
+            "return_air_level_absent": 15,
+            "return_air_level_low": 30,
+            "supply_air_level_absent": 15,
+            "supply_air_level_low": 30,
+            "cc_ease_symbol_supply_air": False,
+            "cc_ease_symbol_exhaust_air": True,
+        }
+    )
+    assert coord.fan_balance == FAN_BALANCE_EXHAUST_ONLY
+
+    # 0xCE says supply_only (exhaust parked) while the display reads balanced:
+    # the HA-side write is still picked up from the level table.
+    coord._state.update(
+        {
+            "return_air_level_low": 15,
+            "cc_ease_symbol_supply_air": True,
+            "cc_ease_symbol_exhaust_air": True,
+        }
+    )
+    assert coord.fan_balance == FAN_BALANCE_SUPPLY_ONLY
 
 
 async def test_async_set_fan_balance_balanced_restores_both_sides() -> None:
@@ -416,24 +471,26 @@ async def test_async_set_fan_balance_balanced_restores_both_sides() -> None:
     assert data == bytes([15, 30, 50, 15, 30, 50, 70, 70, 0x00])
 
 
-async def test_async_set_fan_balance_supply_only_zeroes_exhaust() -> None:
+async def test_async_set_fan_balance_supply_only_parks_exhaust() -> None:
     coord = make_coordinator()
     _seed_baseline(coord)
     fake = FakeTransport()
     coord.transport = cast(ComfoAirTransport, fake)
     await coord.async_set_fan_balance("supply_only")
     _cmd, data = fake.sent[0]
-    assert data == bytes([0, 0, 0, 15, 30, 50, 0, 70, 0x00])
+    # Exhaust (return) low/medium/high parked at its absent value (15); supply intact.
+    assert data == bytes([15, 15, 15, 15, 30, 50, 15, 70, 0x00])
 
 
-async def test_async_set_fan_balance_exhaust_only_zeroes_supply() -> None:
+async def test_async_set_fan_balance_exhaust_only_parks_supply() -> None:
     coord = make_coordinator()
     _seed_baseline(coord)
     fake = FakeTransport()
     coord.transport = cast(ComfoAirTransport, fake)
     await coord.async_set_fan_balance("exhaust_only")
     _cmd, data = fake.sent[0]
-    assert data == bytes([15, 30, 50, 0, 0, 0, 70, 0, 0x00])
+    # Supply low/medium/high parked at its absent value (15); exhaust intact.
+    assert data == bytes([15, 30, 50, 15, 15, 15, 70, 15, 0x00])
 
 
 async def test_async_set_fan_balance_invalid_mode_raises() -> None:
@@ -449,3 +506,20 @@ def test_parse_level_updates_fan_baseline() -> None:
     coord._parse_level(data)
     assert coord._fan_baseline["supply_air_level_high"] == 70
     assert coord._fan_baseline["return_air_level_low"] == 30
+
+
+def test_parse_level_baseline_ignores_parked_side() -> None:
+    """A side parked at its absent floor must not overwrite the remembered values."""
+    coord = make_coordinator()
+    coord._fan_baseline = {}
+    # A balanced frame first establishes the real baselines.
+    coord._parse_level(bytes([15, 30, 50, 15, 30, 50, 70, 70, 2, 1, 70, 70]))
+    assert coord._fan_baseline["return_air_level_low"] == 30
+    # Then exhaust (return) is parked at its absent floor (low/medium/high == 15).
+    coord._parse_level(bytes([15, 15, 15, 15, 30, 50, 15, 70, 2, 1, 15, 70]))
+    # Remembered real values for the parked side are preserved...
+    assert coord._fan_baseline["return_air_level_low"] == 30
+    assert coord._fan_baseline["return_air_level_medium"] == 50
+    assert coord._fan_baseline["return_air_level_high"] == 70
+    # ...while the still-running side keeps updating.
+    assert coord._fan_baseline["supply_air_level_low"] == 30

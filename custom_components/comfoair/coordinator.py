@@ -266,12 +266,22 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         s["return_air_level_high"] = d[10]
         s["supply_air_level_high"] = d[11]
 
-        # Remember the last non-zero percentage per level/side so
-        # async_set_fan_balance can restore balanced after zeroing a side.
-        # A zeroed side is intentionally not recorded.
-        for key in (*_EXHAUST_LEVEL_KEYS, *_SUPPLY_LEVEL_KEYS):
-            v = s.get(key)
-            if v:
+        # Remember the user's real per-level percentages so async_set_fan_balance
+        # can restore "balanced".  A side parked to stop a fan reads back with its
+        # low/medium/high sitting at the absent floor (see async_set_fan_balance);
+        # don't let that floor overwrite the remembered real values.  The absent
+        # value itself is always recorded.
+        for keys, absent_key in (
+            (_EXHAUST_LEVEL_KEYS, "return_air_level_absent"),
+            (_SUPPLY_LEVEL_KEYS, "supply_air_level_absent"),
+        ):
+            absent = s.get(absent_key)
+            for key in keys:
+                v = s.get(key)
+                if not v:
+                    continue
+                if key != absent_key and absent is not None and v <= absent:
+                    continue
                 self._fan_baseline[key] = int(v)
 
     def _parse_temps(self, d: bytes) -> None:
@@ -498,47 +508,75 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     @property
     def fan_balance(self) -> str:
-        """Current fan balance, read from the CC-Ease LCD display symbols (0x3C frame).
+        """Current fan balance, read from whichever source the unit exposes.
 
-        The machine sends its own display state to the CC-Ease panel every poll
-        cycle via CMD_CC_EASE_KEY_STATUS, so this property reflects the unit's
-        actual fan-balance state — not a value stored in Home Assistant.  After a
-        power loss or HA restart the correct mode is recovered automatically on the
-        next poll cycle, with no HA-side state tracking needed.
+        Two independent signals can report the balance, and which is available
+        depends on whether a CC-Ease panel is on the bus:
 
-        Returns FAN_BALANCE_BALANCED when the CC-Ease display has not yet been
-        received (e.g. the very first poll cycle after startup), which is the
-        safest default.
+        * The per-level airflow table (0xCE) is polled every cycle, so it always
+          reflects Home Assistant's own 0xCF writes and any config-level state —
+          the headless source of truth (adorobis/hacomfoairmqtt).  A fan is
+          "parked" (stopped / at minimum) when its low percentage sits at the
+          absent floor; an enabled fan runs above it.
+        * The CC-Ease LCD frame (0x3C) is only emitted when a panel is present or
+          polled.  Its d[9] In/Out airflow icons show what the unit displays on
+          its own panel (this is what pepo83/ha-app-ca350-mqtt-bridge reads).
+
+        A side is reported "off" when *either* source says so, so a change made
+        through Home Assistant *or* through a physical CC-Ease is picked up
+        regardless of which one is connected.  The 0xCF write path always moves
+        0xCE, so HA-initiated changes are seen even if the display never updates;
+        the display only has to carry panel-initiated changes, and the panel is
+        present by definition in that case.
+
+        Returns FAN_BALANCE_BALANCED until a usable signal arrives, and for the
+        both-running and both-parked cases (HA has no "off" balance option).
         """
-        supply = self._state.get("cc_ease_symbol_supply")
-        exhaust = self._state.get("cc_ease_symbol_exhaust")
-        if supply is None or exhaust is None:
+        s = self._state
+        exhaust_off = supply_off = False
+        known = False
+
+        # 0xCE level table — always polled; low at/below the absent floor == parked.
+        e_low, e_abs = s.get("return_air_level_low"), s.get("return_air_level_absent")
+        sp_low, sp_abs = s.get("supply_air_level_low"), s.get("supply_air_level_absent")
+        if None not in (e_low, e_abs, sp_low, sp_abs):
+            known = True
+            exhaust_off |= e_low <= e_abs
+            supply_off |= sp_low <= sp_abs
+
+        # 0x3C display icons — only once a CC-Ease frame has been received.
+        # d[9] & 0x40 == "In" (supply air); d[9] & 0x80 == "Out" (exhaust air).
+        in_icon = s.get("cc_ease_symbol_supply_air")
+        out_icon = s.get("cc_ease_symbol_exhaust_air")
+        if in_icon is not None and out_icon is not None:
+            known = True
+            exhaust_off |= in_icon and not out_icon  # "In" only -> exhaust off
+            supply_off |= out_icon and not in_icon  # "Out" only -> supply off
+
+        if not known:
             return FAN_BALANCE_BALANCED
-        if supply and not exhaust:
-            return FAN_BALANCE_SUPPLY_ONLY
-        if exhaust and not supply:
+        if supply_off and not exhaust_off:
             return FAN_BALANCE_EXHAUST_ONLY
+        if exhaust_off and not supply_off:
+            return FAN_BALANCE_SUPPLY_ONLY
         return FAN_BALANCE_BALANCED
 
     async def async_set_fan_balance(self, mode: str) -> None:
         """Run both fans, supply only, or exhaust only.
 
         Implemented by rewriting the per-level airflow table via
-        CMD_SET_VENTILATION_LEVEL (0xCF): the disabled side's percentages are
-        set to 0, the enabled side is restored from the remembered baseline
-        (the last non-zero values seen on 0xCE frames).  Unlike
-        async_set_fan_percentages this does NOT clamp to the 15..95 range,
-        because 0 is required to stop a fan.
+        CMD_SET_VENTILATION_LEVEL (0xCF): the disabled side's low/medium/high
+        percentages are parked at that side's *absent* value, the enabled side is
+        restored from the remembered baseline (the last real values seen on 0xCE
+        frames).  Parking a fan at its absent floor — rather than 0 — is how the
+        proven hacomfoairmqtt reference (adorobis/hacomfoairmqtt, set_fan_levels)
+        stops a fan: it stays within the ComfoAir's ~15 % minimum, so firmware
+        that clamps sub-minimum setpoints can't silently keep the fan spinning at
+        an unexpected speed.
 
-        State read-back uses the CC-Ease display symbols (see fan_balance
-        property), so the mode reported by Home Assistant always matches what
-        the unit's own display shows — regardless of how the change was made.
-
-        CAVEAT: the ComfoAir enforces a ~15 % minimum fan setpoint when
-        configured through the CC-Ease panel.  Writing 0 % over the serial link
-        is outside that official range; most CA350 firmwares accept it (it is
-        how "extract only" operation is achieved), but some may clamp it to the
-        minimum or ignore it, in which case the fan keeps running at ~15 %.
+        State read-back (see the fan_balance property) compares low vs absent on
+        the always-polled 0xCE table, so the reported mode matches the unit even
+        with no CC-Ease panel attached.
         """
         if mode not in FAN_BALANCE_OPTIONS:
             raise ValueError(f"invalid fan balance mode: {mode}")
@@ -548,12 +586,13 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             base = self._fan_baseline.get(key)
             values[key] = base if base is not None else self._state.get(key)
 
+        # Park the disabled side at its absent floor (all levels == absent).
         if mode == FAN_BALANCE_SUPPLY_ONLY:
             for key in _EXHAUST_LEVEL_KEYS:
-                values[key] = 0
+                values[key] = values["return_air_level_absent"]
         elif mode == FAN_BALANCE_EXHAUST_ONLY:
             for key in _SUPPLY_LEVEL_KEYS:
-                values[key] = 0
+                values[key] = values["supply_air_level_absent"]
 
         payload: list[int] = []
         for key in _FAN_LEVEL_ORDER:

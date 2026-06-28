@@ -28,12 +28,12 @@ async def async_setup_entry(
 class ComfoAirFanBalanceSelect(ComfoAirEntity, SelectEntity):
     """Select balanced / supply-only / exhaust-only ventilation.
 
-    The current mode is read from the CC-Ease LCD display symbols (0x3C frame)
-    so the machine — not Home Assistant — is the source of truth.  The write
-    path uses CMD_SET_VENTILATION_LEVEL to zero one fan's per-level percentages;
-    the next CC-Ease display frame then confirms the new state.
-
-    See ComfoAirCoordinator.async_set_fan_balance for the ~15 % minimum caveat.
+    The current mode is read back from the unit itself — the always-polled
+    ventilation-level table (0xCE, low vs absent) and, when a CC-Ease panel is
+    present, its 0x3C display icons — so the machine, not Home Assistant, owns the
+    state and the control works with or without a panel.  The write path uses
+    CMD_SET_VENTILATION_LEVEL to park one fan at its absent floor; the next level
+    frame then confirms the new state.
     """
 
     _attr_icon = "mdi:fan"
