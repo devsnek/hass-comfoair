@@ -1,27 +1,12 @@
 /*
- * ComfoAir Lovelace card — SVG airflow diagram
- * ─────────────────────────────────────────────
- * A self-contained (no build step) custom card that visualises the
- * ventilation unit with a counter-flow heat-exchanger diagram:
- *   • four air temperatures colour-coded from blue (cold) to red (warm)
- *   • two fan icons that spin proportionally to RPM via SMIL animation
- *   • ventilation level buttons (Away / Low / Medium / High)
- *   • comfort setpoint with − / + controls
- *   • status chips (bypass, summer mode, preheating, filter)
- *   • optional Fan Balance select (rendered only when `fan_balance` is configured)
+ * ESPHome ComfoAir Lovelace card
+ * Counter-flow heat-exchanger diagram with temperature-coloured airflow ribbons.
  *
- * All entity ids are configurable; the defaults assume a device slug of
- * "comfoair" and must usually be edited to match the actual device name.
- *
- * Fan speed animation uses the RPM sensors.  Point `supply_fan` /
- * `return_fan` at `sensor.comfoair_supply_fan_speed_rpm` (or the `_speed`
- * percentage variant if RPM sensors are unavailable — the animation will
- * still work, just scaled differently).
- *
- * Installation: none — the card ships with the integration, which serves it
- * at /comfoair/esphome-comfoair-card.js and loads it into the frontend automatically.
+ * Installation: ships with the integration — no manual resource registration needed.
  * Add a card of type "custom:esphome-comfoair-card" to a dashboard.
  */
+
+(function () {
 
 const DEFAULTS = {
   title:         "ComfoAir",
@@ -38,7 +23,7 @@ const DEFAULTS = {
   summer_mode:   "binary_sensor.comfoair_summer_mode",
   preheating:    "binary_sensor.comfoair_preheating_state",
   filter_status: "sensor.comfoair_filter_status",
-  fan_balance:   null,   // optional, e.g. "select.comfoair_fan_balance"
+  fan_balance:   null,
   temp_step:     1,
 };
 
@@ -50,21 +35,16 @@ const FAN_BALANCE_LABELS = {
   exhaust_only: "Exhaust only",
 };
 
-// Maps a temperature in °C to an HSL colour string.
-// -15 °C → blue (hue 240), +10 °C → cyan-green (hue 120), +35 °C → red (hue 0).
 function _tempColor(celsius) {
   const frac = Math.max(0, Math.min(1, (celsius + 15) / 50));
   return `hsl(${Math.round(240 - frac * 240)},72%,50%)`;
 }
 
-// SVG 3-blade fan path (blades sweep clockwise from the top).
-// Drawn at local (0,0) so <animateTransform> can rotate it in place.
-const _BLADE_PATH =
-  "M 0,0 C -1,-4 -4,-8 0,-10 C 4,-8 3,-3 0,0 Z";
+const _BLADE_PATH = "M 0,0 C -1,-4 -4,-8 0,-10 C 4,-8 3,-3 0,0 Z";
 
-class ComfoAirCard extends HTMLElement {
+class ESPHomeComfoAirCard extends HTMLElement {
   setConfig(config) {
-    this._cfg  = { ...DEFAULTS, ...(config || {}) };
+    this._cfg   = { ...DEFAULTS, ...(config || {}) };
     this._built = false;
     this._sig   = null;
   }
@@ -74,9 +54,7 @@ class ComfoAirCard extends HTMLElement {
     this._render();
   }
 
-  getCardSize() { return 6; }
-
-  // ── helpers ──────────────────────────────────────────────────────────────
+  getCardSize() { return 7; }
 
   _st(id) {
     if (!id || !this._hass) return undefined;
@@ -127,8 +105,6 @@ class ComfoAirCard extends HTMLElement {
     this.dispatchEvent(ev);
   }
 
-  // ── actions ──────────────────────────────────────────────────────────────
-
   _setTemp(delta) {
     const s = this._st(this._cfg.climate);
     if (!s) return;
@@ -147,21 +123,11 @@ class ComfoAirCard extends HTMLElement {
     });
   }
 
-  _cycleFanMode() {
-    const s = this._st(this._cfg.climate);
-    if (!s) return;
-    const modes = s.attributes.fan_modes || ["off", "low", "medium", "high"];
-    const idx = modes.indexOf(s.attributes.fan_mode);
-    this._setFanMode(modes[(idx + 1) % modes.length]);
-  }
-
   _setBalance(option) {
     this._hass.callService("select", "select_option", {
       entity_id: this._cfg.fan_balance, option,
     });
   }
-
-  // ── change detection ─────────────────────────────────────────────────────
 
   _signature() {
     const keys = [
@@ -171,14 +137,12 @@ class ComfoAirCard extends HTMLElement {
     ];
     return keys.map(k => {
       const s = this._st(this._cfg[k]);
-      if (!s) return `${k}:∅`;
+      if (!s) return `${k}:null`;
       const x = k === "climate"
         ? `${s.attributes.temperature}/${s.attributes.fan_mode}` : "";
       return `${k}:${s.state}:${x}`;
     }).join("|");
   }
-
-  // ── render ───────────────────────────────────────────────────────────────
 
   _render() {
     if (!this._hass || !this._cfg) return;
@@ -186,16 +150,17 @@ class ComfoAirCard extends HTMLElement {
     if (this._built && sig === this._sig) return;
     this._sig = sig;
 
-    const cfg     = this._cfg;
-    const climate = this._st(cfg.climate);
-    const target  = climate?.attributes.temperature;
-    const current = climate?.attributes.current_temperature;
-    const fanMode = climate?.attributes.fan_mode;
+    const cfg      = this._cfg;
+    const climate  = this._st(cfg.climate);
+    const target   = climate?.attributes.temperature;
+    const current  = climate?.attributes.current_temperature;
+    const fanMode  = climate?.attributes.fan_mode;
     const fanModes = climate?.attributes.fan_modes ?? ["off", "low", "medium", "high"];
+    const fanModeLabel = FAN_MODE_LABELS[fanMode] ??
+      (fanMode ? fanMode[0].toUpperCase() + fanMode.slice(1) : "—");
 
     const supplyRpm = this._raw(cfg.supply_fan) ?? 0;
     const returnRpm = this._raw(cfg.return_fan) ?? 0;
-    // Rotation period: clamp to [0.2s, 10s].  60/rpm = seconds per revolution.
     const sDur = supplyRpm > 0 ? Math.max(0.2, Math.min(10, 60 / supplyRpm)).toFixed(2) : null;
     const rDur = returnRpm > 0 ? Math.max(0.2, Math.min(10, 60 / returnRpm)).toFixed(2) : null;
 
@@ -204,15 +169,28 @@ class ComfoAirCard extends HTMLElement {
     const returnC  = this._color(cfg.return_temp);
     const exhaustC = this._color(cfg.exhaust_temp);
 
+    const supplyLvl  = this._raw(cfg.supply_level);
+    const returnLvl  = this._raw(cfg.return_level);
     const filterFull = this._text(cfg.filter_status).toLowerCase() === "full";
 
     this.innerHTML = `
-<ha-card header="${this._esc(cfg.title)}">
+<ha-card>
 <style>
   .ca { padding: 8px 16px 16px; }
+  .ca-hdr { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
+  .ca-title { font-size: 1.1em; font-weight: 600; }
+  .ca-subtitle { font-size: .82em; color: var(--secondary-text-color); margin-top: 1px; }
+  .ca-corners { display: flex; justify-content: space-between; padding: 0 2px; }
+  .ca-corner { display: flex; flex-direction: column; max-width: 46%; cursor: pointer; }
+  .ca-corner-r { align-items: flex-end; text-align: right; }
+  .ca-temp-big { font-size: 1.4em; font-weight: 700; line-height: 1.15; }
+  .ca-air-lbl {
+    font-size: .68em; color: var(--secondary-text-color);
+    text-transform: uppercase; letter-spacing: .05em;
+  }
+  .ca-stat { font-size: .78em; color: var(--secondary-text-color); }
   .ca-svg { width: 100%; display: block; }
-  .ca-node { cursor: pointer; }
-  .ca-levels { display: flex; gap: 6px; margin: 6px 0; }
+  .ca-levels { display: flex; gap: 6px; margin: 8px 0 6px; }
   .ca-level {
     flex: 1; padding: 6px 0; border-radius: 6px; cursor: pointer;
     font-size: .88em; border: 1px solid var(--divider-color);
@@ -223,10 +201,7 @@ class ComfoAirCard extends HTMLElement {
     color: var(--text-primary-color, #fff);
     border-color: var(--primary-color);
   }
-  .ca-ctrl {
-    display: flex; align-items: center; gap: 6px; margin: 2px 0 6px;
-    cursor: pointer;
-  }
+  .ca-ctrl { display: flex; align-items: center; gap: 6px; margin: 2px 0 6px; cursor: pointer; }
   .ca-setpoint { font-size: 1.3em; font-weight: 700; min-width: 46px; text-align: center; }
   .ca-cur { font-size: .85em; color: var(--secondary-text-color); }
   .ca-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0; }
@@ -237,8 +212,6 @@ class ComfoAirCard extends HTMLElement {
   }
   .ca-chip.on   { color: var(--state-active-color, var(--primary-color)); }
   .ca-chip.warn { color: var(--error-color); }
-  .ca-levels-row { display: flex; justify-content: space-between;
-                   font-size: .82em; color: var(--secondary-text-color); margin: 0 0 6px; }
   .ca-balance { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
   .ca-balance select {
     flex: 1; padding: 6px; border-radius: 6px; font-size: .9em;
@@ -247,17 +220,51 @@ class ComfoAirCard extends HTMLElement {
   }
 </style>
 <div class="ca">
-  ${this._svg({ outsideC, supplyC, returnC, exhaustC, sDur, rDur, cfg })}
-  <div class="ca-levels-row">
-    <span data-e="${cfg.supply_level}">Supply: ${this._num(cfg.supply_level, 0)}</span>
-    <span data-e="${cfg.return_level}">Return: ${this._num(cfg.return_level, 0)}</span>
+
+  <div class="ca-hdr">
+    <div>
+      <div class="ca-title">${this._esc(cfg.title)}</div>
+      <div class="ca-subtitle">● ${this._esc(fanModeLabel)}</div>
+    </div>
   </div>
+
+  <!-- top corners: Outside Air (left) | Return Air (right) -->
+  <div class="ca-corners">
+    <div class="ca-corner" data-e="${cfg.outside_temp}">
+      ${supplyRpm > 0 ? `<span class="ca-stat">⚙ ${supplyRpm.toFixed(0)} rpm</span>` : ""}
+      <span class="ca-temp-big" style="color:${outsideC}">${this._esc(this._num(cfg.outside_temp))}</span>
+      <span class="ca-air-lbl">Outside Air</span>
+    </div>
+    <div class="ca-corner ca-corner-r" data-e="${cfg.return_temp}">
+      ${returnLvl != null ? `<span class="ca-stat">⊙ ${returnLvl.toFixed(0)} %</span>` : ""}
+      <span class="ca-temp-big" style="color:${returnC}">${this._esc(this._num(cfg.return_temp))}</span>
+      <span class="ca-air-lbl">Return Air</span>
+    </div>
+  </div>
+
+  ${this._svg({ outsideC, supplyC, returnC, exhaustC, sDur, rDur, cfg })}
+
+  <!-- bottom corners: Exhaust Air (left) | Supply Air (right) -->
+  <div class="ca-corners">
+    <div class="ca-corner" data-e="${cfg.exhaust_temp}">
+      <span class="ca-air-lbl">Exhaust Air</span>
+      <span class="ca-temp-big" style="color:${exhaustC}">${this._esc(this._num(cfg.exhaust_temp))}</span>
+      ${returnRpm > 0 ? `<span class="ca-stat">⚙ ${returnRpm.toFixed(0)} rpm</span>` : ""}
+    </div>
+    <div class="ca-corner ca-corner-r" data-e="${cfg.supply_temp}">
+      <span class="ca-air-lbl">Supply Air</span>
+      <span class="ca-temp-big" style="color:${supplyC}">${this._esc(this._num(cfg.supply_temp))}</span>
+      ${supplyLvl != null ? `<span class="ca-stat">⊙ ${supplyLvl.toFixed(0)} %</span>` : ""}
+    </div>
+  </div>
+
   <div class="ca-levels">
     ${fanModes.map(m => {
       const lbl = FAN_MODE_LABELS[m] ?? (m[0].toUpperCase() + m.slice(1));
       return `<button class="ca-level${m === fanMode ? " on" : ""}" data-mode="${this._esc(m)}">${this._esc(lbl)}</button>`;
     }).join("")}
   </div>
+
   <div class="ca-ctrl" data-e="${cfg.climate}">
     <ha-icon-button class="ca-down" label="Lower temperature">
       <ha-icon icon="mdi:minus"></ha-icon>
@@ -266,8 +273,9 @@ class ComfoAirCard extends HTMLElement {
     <ha-icon-button class="ca-up" label="Raise temperature">
       <ha-icon icon="mdi:plus"></ha-icon>
     </ha-icon-button>
-    <span class="ca-cur">${current != null ? "now " + current + "°" : ""}</span>
+    <span class="ca-cur">${current != null ? "now " + current + "°" : ""}</span>
   </div>
+
   <div class="ca-row">
     ${this._chip(cfg.bypass, this._isOn(cfg.bypass), false,
         "mdi:valve", "Bypass " + (this._isOn(cfg.bypass) ? "open" : "closed"))}
@@ -278,7 +286,9 @@ class ComfoAirCard extends HTMLElement {
     ${this._chip(cfg.filter_status, false, filterFull,
         "mdi:air-filter", "Filter " + this._text(cfg.filter_status))}
   </div>
+
   ${this._renderBalance()}
+
 </div>
 </ha-card>`;
 
@@ -292,116 +302,89 @@ class ComfoAirCard extends HTMLElement {
       `<ha-icon icon="${icon}"></ha-icon>${this._esc(label)}</span>`;
   }
 
-  // ── SVG airflow diagram ───────────────────────────────────────────────────
+  // ── SVG airflow diagram ─────────────────────────────────────────────────
   //
-  // Layout (viewBox 0 0 300 200):
+  //  viewBox 0 0 300 100    stroke-width 36
   //
-  //   Outside(TL) ─────┐                   ┌───── Return(TR)
-  //                    └──\   [HX box]  /──┘
-  //                        \           /
-  //                        /     ×     \       ← counter-flow crossing
-  //                       /             \
-  //                   ┌──/               \──┐
-  //   Exhaust(BL) ────┘                     └──── Supply(BR)
+  //  Supply ribbon  (Outside → Supply):  M 0,25 H 80 L 220,75 H 300   TL → BR
+  //  Exhaust ribbon (Return  → Exhaust): M 300,25 H 220 L 80,75 H 0   TR → BL
   //
-  // Supply ribbon (Outside→Supply, TL→BR): flat → diagonal cross → flat
-  // Exhaust ribbon (Return→Exhaust, TR→BL): flat → diagonal cross → flat
-  // Gradients: outsideC→supplyC and returnC→exhaustC along each ribbon.
+  //  The two paths cross at (150, 50).
+  //  Spinning fan icons sit on the top flat segments (near each inlet).
+  //  Directional chevrons on the bottom flat segments show flow direction.
 
   _svg({ outsideC, supplyC, returnC, exhaustC, sDur, rDur, cfg }) {
-    // Node label centres
-    const NO  = [40,  40];   // Outside  — top-left
-    const NRE = [260, 40];   // Return   — top-right
-    const NSP = [260, 162];  // Supply   — bottom-right
-    const NEX = [40,  162];  // Exhaust  — bottom-left
+    const W  = 300, H = 100;
+    const pt = 25;    // y of top flat segments
+    const pb = 75;    // y of bottom flat segments
+    const kl = 80;    // x: left kink (horizontal → diagonal)
+    const kr = 220;   // x: right kink
 
-    // Ribbon waypoints: horizontal flat segments meet diagonal at these x coords
-    const py_top = 54;   // y of top flat segments
-    const py_bot = 146;  // y of bottom flat segments
-    const kl = 95;       // x where left horizontal turns diagonal
-    const kr = 205;      // x where right horizontal turns diagonal
+    // Fan positions: ⅔ along each top flat segment from the node edge
+    const fSX = Math.round(kl * 2 / 3);           // supply fan  (~53, on TL seg)
+    const fRX = Math.round(W - (W - kr) * 2 / 3); // return fan  (~247, on TR seg)
 
-    // Fan icon centres: ⅔ along the flat top segment toward the unit
-    const fSX = Math.round(NO[0]  + (kl - NO[0])  * 2 / 3);  // supply fan
-    const fRX = Math.round(NRE[0] - (NRE[0] - kr) * 2 / 3);  // return fan
+    const blades = (color) => [0, 120, 240].map(a =>
+      `<path d="${_BLADE_PATH}" fill="${color}" transform="rotate(${a})"/>`
+    ).join("");
 
-    const fan = (x, y, color, dur, entityId) => {
-      const blades = [0, 120, 240].map(a =>
-        `<path d="${_BLADE_PATH}" fill="${color}" transform="rotate(${a})"/>`
-      ).join("");
-      const anim = dur
-        ? `<animateTransform attributeName="transform" type="rotate"
-             from="0 0 0" to="360 0 0" dur="${dur}s"
-             repeatCount="indefinite" additive="sum"/>`
-        : "";
-      return `<g transform="translate(${x} ${y})" class="ca-node" data-e="${entityId}">
-        <circle cx="0" cy="0" r="11" fill="var(--card-background-color)" opacity="0.82"/>
-        ${blades}
-        <circle cx="0" cy="0" r="2" fill="${color}"/>
-        ${anim}
+    const anim = (dur) => dur
+      ? `<animateTransform attributeName="transform" type="rotate"
+           from="0 0 0" to="360 0 0" dur="${dur}s"
+           repeatCount="indefinite" additive="sum"/>`
+      : "";
+
+    const fan = (x, y, color, dur, eid) =>
+      `<g transform="translate(${x} ${y})" data-e="${eid}" style="cursor:pointer">
+        <circle r="12" fill="var(--card-background-color)" opacity="0.78"/>
+        ${blades(color)}
+        <circle r="2" fill="${color}"/>
+        ${anim(dur)}
       </g>`;
-    };
 
-    return `<svg class="ca-svg" viewBox="0 0 300 200" xmlns="http://www.w3.org/2000/svg"
+    // Chevron pointing right → (tip at right)
+    const chevR = (x, y) =>
+      `<polygon points="${x-9},${y-8} ${x+9},${y} ${x-9},${y+8}" fill="rgba(255,255,255,0.30)"/>`;
+    // Chevron pointing left ← (tip at left)
+    const chevL = (x, y) =>
+      `<polygon points="${x+9},${y-8} ${x-9},${y} ${x+9},${y+8}" fill="rgba(255,255,255,0.30)"/>`;
+
+    // Midpoints of the bottom flat segments
+    const midBR = Math.round(kr + (W - kr) / 2);   // ~260, supply bottom seg
+    const midBL = Math.round(kl / 2);               //  ~40, exhaust bottom seg
+
+    return `<svg class="ca-svg" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg"
       role="img" aria-label="ComfoAir airflow diagram">
   <defs>
-    <!-- supply ribbon gradient: outside colour → supply colour, along TL→BR diagonal -->
     <linearGradient id="eca-sg" gradientUnits="userSpaceOnUse"
-        x1="${NO[0]}" y1="${py_top}" x2="${NSP[0]}" y2="${py_bot}">
+        x1="0" y1="${pt}" x2="${W}" y2="${pb}">
       <stop offset="0%"   stop-color="${outsideC}"/>
       <stop offset="100%" stop-color="${supplyC}"/>
     </linearGradient>
-    <!-- exhaust ribbon gradient: return colour → exhaust colour, along TR→BL diagonal -->
     <linearGradient id="eca-rg" gradientUnits="userSpaceOnUse"
-        x1="${NRE[0]}" y1="${py_top}" x2="${NEX[0]}" y2="${py_bot}">
+        x1="${W}" y1="${pt}" x2="0" y2="${pb}">
       <stop offset="0%"   stop-color="${returnC}"/>
       <stop offset="100%" stop-color="${exhaustC}"/>
     </linearGradient>
   </defs>
 
-  <!-- exhaust ribbon (return → exhaust, TR→BL): drawn first so supply overlaps at cross -->
-  <path d="M${NRE[0]},${py_top} H${kr} L${kl},${py_bot} H${NEX[0]}"
-    fill="none" stroke="url(#eca-rg)" stroke-width="16"
+  <!-- exhaust ribbon: Return(TR) → Exhaust(BL) — drawn first (behind) -->
+  <path d="M${W},${pt} H${kr} L${kl},${pb} H0"
+    fill="none" stroke="url(#eca-rg)" stroke-width="36"
     stroke-linecap="round" stroke-linejoin="round"/>
 
-  <!-- supply ribbon (outside → supply, TL→BR) -->
-  <path d="M${NO[0]},${py_top} H${kl} L${kr},${py_bot} H${NSP[0]}"
-    fill="none" stroke="url(#eca-sg)" stroke-width="16"
+  <!-- supply ribbon: Outside(TL) → Supply(BR) — drawn on top -->
+  <path d="M0,${pt} H${kl} L${kr},${pb} H${W}"
+    fill="none" stroke="url(#eca-sg)" stroke-width="36"
     stroke-linecap="round" stroke-linejoin="round"/>
 
-  <!-- heat exchanger unit box (subtle, around the crossing) -->
-  <rect x="108" y="63" width="84" height="74" rx="5"
-    fill="none" stroke="var(--divider-color)" stroke-width="1.5" opacity="0.55"/>
+  <!-- directional chevrons on the bottom flat segments -->
+  ${chevR(midBR, pb)}
+  ${chevL(midBL, pb)}
 
-  <!-- fan icons (on the flat incoming legs) -->
-  ${fan(fSX, py_top, outsideC, sDur, cfg.supply_fan)}
-  ${fan(fRX, py_top, returnC,  rDur, cfg.return_fan)}
-
-  <!-- temperature node labels (clickable) -->
-  <g class="ca-node" data-e="${cfg.outside_temp}">
-    <text x="${NO[0]}" y="${NO[1] - 10}" text-anchor="middle"
-      fill="var(--secondary-text-color)" font-size="9">Outside</text>
-    <text x="${NO[0]}" y="${NO[1] + 5}" text-anchor="middle"
-      fill="${outsideC}" font-size="14" font-weight="600">${this._esc(this._num(cfg.outside_temp))}</text>
-  </g>
-  <g class="ca-node" data-e="${cfg.return_temp}">
-    <text x="${NRE[0]}" y="${NRE[1] - 10}" text-anchor="middle"
-      fill="var(--secondary-text-color)" font-size="9">Return</text>
-    <text x="${NRE[0]}" y="${NRE[1] + 5}" text-anchor="middle"
-      fill="${returnC}" font-size="14" font-weight="600">${this._esc(this._num(cfg.return_temp))}</text>
-  </g>
-  <g class="ca-node" data-e="${cfg.supply_temp}">
-    <text x="${NSP[0]}" y="${NSP[1] - 4}" text-anchor="middle"
-      fill="${supplyC}" font-size="14" font-weight="600">${this._esc(this._num(cfg.supply_temp))}</text>
-    <text x="${NSP[0]}" y="${NSP[1] + 11}" text-anchor="middle"
-      fill="var(--secondary-text-color)" font-size="9">Supply</text>
-  </g>
-  <g class="ca-node" data-e="${cfg.exhaust_temp}">
-    <text x="${NEX[0]}" y="${NEX[1] - 4}" text-anchor="middle"
-      fill="${exhaustC}" font-size="14" font-weight="600">${this._esc(this._num(cfg.exhaust_temp))}</text>
-    <text x="${NEX[0]}" y="${NEX[1] + 11}" text-anchor="middle"
-      fill="var(--secondary-text-color)" font-size="9">Exhaust</text>
-  </g>
+  <!-- spinning fan icons on the top flat segments -->
+  ${fan(fSX, pt, outsideC, sDur, cfg.supply_fan)}
+  ${fan(fRX, pt, returnC,  rDur, cfg.return_fan)}
 </svg>`;
   }
 
@@ -419,8 +402,6 @@ class ComfoAirCard extends HTMLElement {
       <select class="ca-bal-sel">${opts}</select>
     </div>`;
   }
-
-  // ── event wiring ─────────────────────────────────────────────────────────
 
   _wire() {
     this.querySelectorAll("[data-e]").forEach(el => {
@@ -449,12 +430,14 @@ class ComfoAirCard extends HTMLElement {
   }
 }
 
-customElements.define("esphome-comfoair-card", ComfoAirCard);
+customElements.define("esphome-comfoair-card", ESPHomeComfoAirCard);
 
 window.customCards ??= [];
 window.customCards.push({
   type:        "esphome-comfoair-card",
   name:        "ComfoAir Card",
-  description: "SVG counter-flow heat-exchanger diagram with colour-coded temperatures, animated fan icons, ventilation level buttons, status chips and optional Fan Balance.",
+  description: "Counter-flow heat-exchanger diagram with temperature-coloured airflow ribbons, animated fan icons, and ventilation controls.",
   preview:     false,
 });
+
+})();
