@@ -1,0 +1,125 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "ComfoAir",
+        "description": "Wählen Sie den seriellen Anschluss, an dem das ComfoAir angeschlossen ist.",
+        "data": {
+          "port": "Serieller Port"
+        }
+      },
+      "manual_path": {
+        "title": "Seriellen Pfad eingeben",
+        "description": "Geben Sie den vollständigen Pfad zum seriellen Gerät ein.",
+        "data": {
+          "port": "Serieller Port"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Serieller Port konnte nicht geöffnet werden.",
+      "no_response": "Keine Antwort vom Lüftungsgerät."
+    },
+    "abort": {
+      "already_configured": "Dieser serielle Port ist bereits konfiguriert."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "supply_fan_speed": { "name": "Lüfterdrehzahl Zuluft" },
+      "return_fan_speed": { "name": "Lüfterdrehzahl Abluft" },
+      "supply_fan_speed_rpm": { "name": "Lüfterdrehzahl Zuluft (U/min)" },
+      "return_fan_speed_rpm": { "name": "Lüfterdrehzahl Abluft (U/min)" },
+      "ventilation_level": { "name": "Lüftungsstufe" },
+      "return_air_level": { "name": "Abluft-Stufe" },
+      "supply_air_level": { "name": "Zuluft-Stufe" },
+      "outside_air_temperature": { "name": "Außentemperatur" },
+      "supply_air_temperature": { "name": "Zulufttemperatur" },
+      "return_air_temperature": { "name": "Rücklufttemperatur" },
+      "exhaust_air_temperature": { "name": "Fortlufttemperatur" },
+      "level0_hours": { "name": "Stunden Stufe 0" },
+      "level1_hours": { "name": "Stunden Stufe 1" },
+      "level2_hours": { "name": "Stunden Stufe 2" },
+      "level3_hours": { "name": "Stunden Stufe 3" },
+      "frost_protection_hours": { "name": "Stunden Frostschutz" },
+      "filter_hours": { "name": "Stunden Filter" },
+      "filter_status": { "name": "Filterstatus" },
+      "current_errors": { "name": "Aktuelle Fehler" },
+      "last_errors": { "name": "Letzte Fehler" },
+      "second_last_errors": { "name": "Vorletzte Fehler" },
+      "third_last_errors": { "name": "Fehler N-3" },
+      "bypass_valve": { "name": "Bypass-Ventil" },
+      "bypass_factor": { "name": "Bypass-Faktor" },
+      "bypass_step": { "name": "Bypass-Schritt" },
+      "bypass_correction": { "name": "Bypass-Korrektur" },
+      "bypass_open_hours": { "name": "Stunden Bypass offen" },
+      "motor_current_bypass": { "name": "Motorstrom Bypass" },
+      "motor_current_preheating": { "name": "Motorstrom Vorheizung" },
+      "preheating_hours": { "name": "Stunden Vorheizung" },
+      "frost_protection_minutes": { "name": "Minuten Frostschutz" },
+      "preheating_valve": { "name": "Vorheizventil" },
+      "frost_protection_level": { "name": "Frostschutzstufe" },
+      "enthalpy_temperature": { "name": "Enthalpietemperatur" },
+      "ewt_temperature": { "name": "EWT-Temperatur" },
+      "reheating_temperature": { "name": "Nachheiztemperatur" },
+      "kitchen_hood_temperature": { "name": "Dunstabzugshaube Temperatur" },
+      "analog_input_1": { "name": "Analogeingang 1" },
+      "analog_input_2": { "name": "Analogeingang 2" },
+      "analog_input_3": { "name": "Analogeingang 3" },
+      "analog_input_4": { "name": "Analogeingang 4" },
+      "postheating_power": { "name": "Nachheizleistung" },
+      "postheating_power_i": { "name": "Nachheizleistung I" }
+    },
+    "binary_sensor": {
+      "supply_fan_active": { "name": "Zuluftlüfter aktiv" },
+      "frost_protection_active": { "name": "Frostschutz aktiv" },
+      "summer_mode": { "name": "Sommermodus" },
+      "bypass_valve_open": { "name": "Bypass-Ventil offen" },
+      "preheating_state": { "name": "Vorheizstatus" },
+      "step_switch_l1": { "name": "Stufenschalter L1" },
+      "step_switch_l2": { "name": "Stufenschalter L2" },
+      "bathroom_switch": { "name": "Badschalter" },
+      "bathroom_switch_2": { "name": "Badschalter 2" },
+      "external_filter_switch": { "name": "Externer Filterschalter" },
+      "heat_recovery_switch": { "name": "Wärmerückgewinnungsschalter" },
+      "kitchen_hood_switch": { "name": "Dunstabzugshaube Schalter" }
+    },
+    "number": {
+      "return_air_level_absent": { "name": "Abluft-Stufe – Abwesend" },
+      "return_air_level_low": { "name": "Abluft-Stufe – Niedrig" },
+      "return_air_level_medium": { "name": "Abluft-Stufe – Mittel" },
+      "return_air_level_high": { "name": "Abluft-Stufe – Hoch" },
+      "supply_air_level_absent": { "name": "Zuluft-Stufe – Abwesend" },
+      "supply_air_level_low": { "name": "Zuluft-Stufe – Niedrig" },
+      "supply_air_level_medium": { "name": "Zuluft-Stufe – Mittel" },
+      "supply_air_level_high": { "name": "Zuluft-Stufe – Hoch" },
+      "bathroom_switch_on_delay_minutes": { "name": "Einschaltverzögerung Bad" },
+      "bathroom_switch_off_delay_minutes": { "name": "Ausschaltverzögerung Bad" },
+      "l1_switch_off_delay_minutes": { "name": "Ausschaltverzögerung L1" },
+      "boost_ventilation_minutes": { "name": "Boost-Lüftung" },
+      "filter_warning_weeks": { "name": "Wochen bis Filterwarnung" },
+      "rf_high_time_short_minutes": { "name": "HF Hochzeit kurz" },
+      "rf_high_time_long_minutes": { "name": "HF Hochzeit lang" },
+      "extractor_hood_switch_off_delay_minutes": { "name": "Ausschaltverzögerung Dunstabzug" },
+      "ewt_low_temperature": { "name": "EWT-Temperatur niedrig" },
+      "ewt_high_temperature": { "name": "EWT-Temperatur hoch" },
+      "ewt_speed_up": { "name": "EWT-Beschleunigung" },
+      "kitchen_hood_speed_up": { "name": "Dunstabzug Beschleunigung" },
+      "postheating_target_temperature": { "name": "Zieltemperatur Nachheizung" }
+    },
+    "button": {
+      "filter_reset": { "name": "Filter zurücksetzen" },
+      "error_reset": { "name": "Fehler zurücksetzen" }
+    },
+    "select": {
+      "fan_balance": {
+        "name": "Lüfterbalance",
+        "state": {
+          "balanced": "Ausgewogen",
+          "supply_only": "Nur Zuluft",
+          "exhaust_only": "Nur Abluft"
+        }
+      }
+    }
+  }
+}
