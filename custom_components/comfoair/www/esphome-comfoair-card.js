@@ -271,7 +271,7 @@ const pt=t=>(e,i)=>{void 0!==i?i.addInitializer(()=>{customElements.define(t,e)}
 {
   const _ca = customElements.get('esphome-comfoair-card');
   if (_ca) {
-    const _VER = 'v0.16.3-hca.4';
+    const _VER = 'v0.16.3-hca.5';
 
     // ── i18n string table ─────────────────────────────────────────────────────
     const _STRINGS = {
@@ -287,8 +287,8 @@ const pt=t=>(e,i)=>{void 0!==i?i.addInitializer(()=>{customElements.define(t,e)}
         fl_animation_speed_source: 'Speed source',
         fl_animation_speed:        'Fixed speed (%)',
         fl_color_scale:            'Colour scale',
-        fl_temp_min:               'Fixed scale – Min (°C)',
-        fl_temp_max:               'Fixed scale – Max (°C)',
+        fl_temp_min:               'Min temperature (°C)',
+        fl_temp_max:               'Max temperature (°C)',
         fl_show_legend:            'Show temperature scale',
         fl_name:                   'Name (optional)',
         fl_tempSensor1:            'Outside air temperature',
@@ -344,8 +344,8 @@ const pt=t=>(e,i)=>{void 0!==i?i.addInitializer(()=>{customElements.define(t,e)}
         fl_animation_speed_source: 'Sorgente velocità',
         fl_animation_speed:        'Velocità fissa (%)',
         fl_color_scale:            'Scala colori',
-        fl_temp_min:               'Scala fissa – Min (°C)',
-        fl_temp_max:               'Scala fissa – Max (°C)',
+        fl_temp_min:               'Temperatura min (°C)',
+        fl_temp_max:               'Temperatura max (°C)',
         fl_show_legend:            'Mostra scala temperatura',
         fl_name:                   'Nome (opzionale)',
         fl_tempSensor1:            'Temperatura aria esterna',
@@ -396,8 +396,8 @@ const pt=t=>(e,i)=>{void 0!==i?i.addInitializer(()=>{customElements.define(t,e)}
         fl_animation_speed_source: 'Tempo-Quelle',
         fl_animation_speed:        'Festes Tempo (%)',
         fl_color_scale:            'Farbskala',
-        fl_temp_min:               'Feste Skala – Min (°C)',
-        fl_temp_max:               'Feste Skala – Max (°C)',
+        fl_temp_min:               'Min-Temperatur (°C)',
+        fl_temp_max:               'Max-Temperatur (°C)',
         fl_show_legend:            'Temperaturskala einblenden',
         fl_name:                   'Name (optional)',
         fl_tempSensor1:            'Außentemperatur',
@@ -509,12 +509,10 @@ const pt=t=>(e,i)=>{void 0!==i?i.addInitializer(()=>{customElements.define(t,e)}
           { value: 'auto',  label: tr('opt_scale_auto') },
           { value: 'fixed', label: tr('opt_scale_fixed') },
         ]}}});
-        if ('fixed' === t.color_scale) {
-          schema.push(
-            { name: 'temp_min', selector: { number: { min: -20, max: 20, step: 1, unit_of_measurement: '°C', mode: 'box' } } },
-            { name: 'temp_max', selector: { number: { min: 0,   max: 50, step: 1, unit_of_measurement: '°C', mode: 'box' } } },
-          );
-        }
+        schema.push(
+          { name: 'temp_min', selector: { number: { min: -20, max: 20, step: 1, unit_of_measurement: '°C', mode: 'box' } } },
+          { name: 'temp_max', selector: { number: { min: 0,   max: 50, step: 1, unit_of_measurement: '°C', mode: 'box' } } },
+        );
         schema.push({ name: 'show_legend', selector: { boolean: {} } });
         return schema;
       };
