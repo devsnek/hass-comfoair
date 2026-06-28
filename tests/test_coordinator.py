@@ -20,6 +20,9 @@ from custom_components.comfoair.const import (
     FEATURE_KITCHEN_HOOD,
     FEATURE_POSTHEATING,
     FEATURE_PREHEATING,
+    FAN_BALANCE_BALANCED,
+    FAN_BALANCE_EXHAUST_ONLY,
+    FAN_BALANCE_SUPPLY_ONLY,
 )
 from custom_components.comfoair.coordinator import (
     ComfoAirCoordinator,
@@ -356,3 +359,93 @@ async def test_async_set_fan_percentages_clamps_and_requires_known_values() -> N
     cmd, data = fake.sent[0]
     assert cmd == p.CMD_SET_VENTILATION_LEVEL
     assert data == bytes([15, 30, 40, 50, 60, 70, 95, 80, 0x00])
+
+
+# ---------------------------------------------------------------------------
+# Fan balance — CC-Ease symbol-based state read and write path
+# ---------------------------------------------------------------------------
+
+
+def _seed_baseline(coord: ComfoAirCoordinator) -> None:
+    """Populate a balanced fan baseline for write-path tests."""
+    coord._fan_baseline = {
+        "return_air_level_absent": 15,
+        "return_air_level_low": 30,
+        "return_air_level_medium": 50,
+        "return_air_level_high": 70,
+        "supply_air_level_absent": 15,
+        "supply_air_level_low": 30,
+        "supply_air_level_medium": 50,
+        "supply_air_level_high": 70,
+    }
+
+
+def test_fan_balance_property_reads_cc_ease_symbols() -> None:
+    """fan_balance derives state from CC-Ease display symbols, not fan percentages."""
+    coord = make_coordinator()
+
+    # Both symbols lit → balanced
+    coord._state["cc_ease_symbol_supply"] = True
+    coord._state["cc_ease_symbol_exhaust"] = True
+    assert coord.fan_balance == FAN_BALANCE_BALANCED
+
+    # Supply symbol only → supply_only
+    coord._state["cc_ease_symbol_exhaust"] = False
+    assert coord.fan_balance == FAN_BALANCE_SUPPLY_ONLY
+
+    # Exhaust symbol only → exhaust_only
+    coord._state["cc_ease_symbol_supply"] = False
+    coord._state["cc_ease_symbol_exhaust"] = True
+    assert coord.fan_balance == FAN_BALANCE_EXHAUST_ONLY
+
+    # No CC-Ease data yet → safe default (balanced)
+    del coord._state["cc_ease_symbol_supply"]
+    del coord._state["cc_ease_symbol_exhaust"]
+    assert coord.fan_balance == FAN_BALANCE_BALANCED
+
+
+async def test_async_set_fan_balance_balanced_restores_both_sides() -> None:
+    coord = make_coordinator()
+    _seed_baseline(coord)
+    fake = FakeTransport()
+    coord.transport = cast(ComfoAirTransport, fake)
+    await coord.async_set_fan_balance("balanced")
+    cmd, data = fake.sent[0]
+    assert cmd == p.CMD_SET_VENTILATION_LEVEL
+    # byte order: exhaust a/l/m, supply a/l/m, exhaust high, supply high, trailing 0
+    assert data == bytes([15, 30, 50, 15, 30, 50, 70, 70, 0x00])
+
+
+async def test_async_set_fan_balance_supply_only_zeroes_exhaust() -> None:
+    coord = make_coordinator()
+    _seed_baseline(coord)
+    fake = FakeTransport()
+    coord.transport = cast(ComfoAirTransport, fake)
+    await coord.async_set_fan_balance("supply_only")
+    _cmd, data = fake.sent[0]
+    assert data == bytes([0, 0, 0, 15, 30, 50, 0, 70, 0x00])
+
+
+async def test_async_set_fan_balance_exhaust_only_zeroes_supply() -> None:
+    coord = make_coordinator()
+    _seed_baseline(coord)
+    fake = FakeTransport()
+    coord.transport = cast(ComfoAirTransport, fake)
+    await coord.async_set_fan_balance("exhaust_only")
+    _cmd, data = fake.sent[0]
+    assert data == bytes([15, 30, 50, 0, 0, 0, 70, 0, 0x00])
+
+
+async def test_async_set_fan_balance_invalid_mode_raises() -> None:
+    coord = make_coordinator()
+    with pytest.raises(ValueError):
+        await coord.async_set_fan_balance("nonsense")
+
+
+def test_parse_level_updates_fan_baseline() -> None:
+    coord = make_coordinator()
+    coord._fan_baseline = {}
+    data = bytes([15, 30, 50, 15, 30, 50, 30, 30, 2, 1, 70, 70])
+    coord._parse_level(data)
+    assert coord._fan_baseline["supply_air_level_high"] == 70
+    assert coord._fan_baseline["return_air_level_low"] == 30

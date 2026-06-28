@@ -25,6 +25,7 @@ PLATFORMS: list[Platform] = [
     Platform.BINARY_SENSOR,
     Platform.BUTTON,
     Platform.NUMBER,
+    Platform.SELECT,
 ]
 
 CARD_URL = "/comfoair/esphome-comfoair-card.js"
