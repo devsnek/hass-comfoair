@@ -27,9 +27,9 @@
   "entity": {
     "sensor": {
       "supply_fan_speed": { "name": "Supply Fan Speed" },
-      "return_fan_speed": { "name": "Return Fan Speed" },
+      "exhaust_fan_speed": { "name": "Exhaust Fan Speed" },
       "supply_fan_speed_rpm": { "name": "Supply Fan Speed RPM" },
-      "return_fan_speed_rpm": { "name": "Return Fan Speed RPM" },
+      "exhaust_fan_speed_rpm": { "name": "Exhaust Fan Speed RPM" },
       "ventilation_level": { "name": "Ventilation Level" },
       "return_air_level": { "name": "Return Air Level" },
       "supply_air_level": { "name": "Supply Air Level" },

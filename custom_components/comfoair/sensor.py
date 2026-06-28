@@ -66,9 +66,9 @@ _MINUTES: Any = dict(
 SENSORS: tuple[ComfoAirSensorEntityDescription, ...] = (
     # fan
     ComfoAirSensorEntityDescription(key="supply_fan_speed", **_PCT),
-    ComfoAirSensorEntityDescription(key="return_fan_speed", **_PCT),
+    ComfoAirSensorEntityDescription(key="exhaust_fan_speed", **_PCT),
     ComfoAirSensorEntityDescription(key="supply_fan_speed_rpm", **_RPM),
-    ComfoAirSensorEntityDescription(key="return_fan_speed_rpm", **_RPM),
+    ComfoAirSensorEntityDescription(key="exhaust_fan_speed_rpm", **_RPM),
     # ventilation level
     ComfoAirSensorEntityDescription(
         key="ventilation_level",

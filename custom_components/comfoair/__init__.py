@@ -30,12 +30,11 @@ PLATFORMS: list[Platform] = [
 
 
 _UNIQUE_ID_MIGRATIONS = {
-    # Renamed for supply/return/outside/exhaust terminology ("intake" fan is supply fan).
+    # Renamed for supply/exhaust terminology ("intake" fan is supply fan).
     "intake_fan_speed": "supply_fan_speed",
     "intake_fan_speed_rpm": "supply_fan_speed_rpm",
-    # The "Abluft" fan is the Return-port fan, not exhaust (Fortluft).
-    "exhaust_fan_speed": "return_fan_speed",
-    "exhaust_fan_speed_rpm": "return_fan_speed_rpm",
+    "return_fan_speed": "exhaust_fan_speed",
+    "return_fan_speed_rpm": "exhaust_fan_speed_rpm",
 }
 
 

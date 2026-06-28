@@ -101,9 +101,9 @@ def test_parse_fan() -> None:
     coord._parse_fan(data)
     s = coord._state
     assert s["supply_fan_speed"] == 40
-    assert s["return_fan_speed"] == 60
+    assert s["exhaust_fan_speed"] == 60
     assert s["supply_fan_speed_rpm"] == 1500
-    assert s["return_fan_speed_rpm"] == 750
+    assert s["exhaust_fan_speed_rpm"] == 750
 
 
 # --- _parse_temps -------------------------------------------------------------
