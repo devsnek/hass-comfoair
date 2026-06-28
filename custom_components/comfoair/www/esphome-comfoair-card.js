@@ -260,6 +260,8 @@ const pt=t=>(e,i)=>{void 0!==i?i.addInitializer(()=>{customElements.define(t,e)}
  *  • jt          – filterstatus entity picker fixed to domain "sensor"
  *  • _mainSchema – editor select options localised via Lt()
  *  • _label      – recomputed each render cycle using the HA UI language
+ *  • hca-controls – custom element: collapsible controls panel (fan / temp / balance / boost / resets)
+ *  • updated     – injects / refreshes hca-controls after each render
  *  • firstUpdated – version badge appended to ha-card once after first render
  *  • setConfig   – injects hass-comfoair entity defaults (no YAML required)
  *
@@ -269,7 +271,7 @@ const pt=t=>(e,i)=>{void 0!==i?i.addInitializer(()=>{customElements.define(t,e)}
 {
   const _ca = customElements.get('esphome-comfoair-card');
   if (_ca) {
-    const _VER = 'v0.16.3-hca.3';
+    const _VER = 'v0.16.3-hca.4';
 
     // ── i18n string table ─────────────────────────────────────────────────────
     const _STRINGS = {
@@ -321,6 +323,16 @@ const pt=t=>(e,i)=>{void 0!==i?i.addInitializer(()=>{customElements.define(t,e)}
         lbl_exhaust: 'Exhaust air', lbl_supply: 'Supply air',
         heat_recovery: 'Heat recovery',
         show_history:  'Show history',
+        // Controls panel
+        ctrl_controls:     'Controls',
+        ctrl_fan_level:    'Fan level',
+        ctrl_temperature:  'Temperature',
+        ctrl_fan_balance:  'Fan balance',
+        ctrl_boost:        'Boost',
+        ctrl_reset_errors: 'Reset errors',
+        ctrl_reset_filter: 'Reset filter',
+        bal_balanced: 'Balanced', bal_supply: 'Supply', bal_exhaust: 'Exhaust',
+        min_suffix: 'min',
       },
       it: {
         invalid_config: 'Configurazione non valida',
@@ -364,6 +376,15 @@ const pt=t=>(e,i)=>{void 0!==i?i.addInitializer(()=>{customElements.define(t,e)}
         lbl_exhaust: 'Aria espulsa',   lbl_supply: 'Aria immessa',
         heat_recovery: 'Recupero calore',
         show_history:  'Mostra storico',
+        ctrl_controls:     'Controlli',
+        ctrl_fan_level:    'Velocità ventilatori',
+        ctrl_temperature:  'Temperatura',
+        ctrl_fan_balance:  'Bilanciamento',
+        ctrl_boost:        'Boost',
+        ctrl_reset_errors: 'Reset errori',
+        ctrl_reset_filter: 'Reset filtro',
+        bal_balanced: 'Bilanciato', bal_supply: 'Solo mandata', bal_exhaust: 'Solo ripresa',
+        min_suffix: 'min',
       },
       de: {
         invalid_config: 'Ungültige Konfiguration',
@@ -407,6 +428,15 @@ const pt=t=>(e,i)=>{void 0!==i?i.addInitializer(()=>{customElements.define(t,e)}
         lbl_exhaust: 'Fortluft',       lbl_supply: 'Zuluft',
         heat_recovery: 'Rückgewinnung',
         show_history:  'Verlauf anzeigen',
+        ctrl_controls:     'Steuerung',
+        ctrl_fan_level:    'Lüfterstufe',
+        ctrl_temperature:  'Temperatur',
+        ctrl_fan_balance:  'Lüfterbalance',
+        ctrl_boost:        'Boost',
+        ctrl_reset_errors: 'Fehler zurücksetzen',
+        ctrl_reset_filter: 'Filter zurücksetzen',
+        bal_balanced: 'Ausgewogen', bal_supply: 'Nur Zuluft', bal_exhaust: 'Nur Abluft',
+        min_suffix: 'min',
       },
       nb: {
         invalid_config: 'Ikke gyldig konfigurasjon',
@@ -489,6 +519,181 @@ const pt=t=>(e,i)=>{void 0!==i?i.addInitializer(()=>{customElements.define(t,e)}
         return schema;
       };
     }
+
+    /* ── Controls panel ─────────────────────────────────────────────────────────
+     * Vanilla custom element — avoids patching the main card's Lit render().
+     * Injected into ha-card's shadow DOM by the updated() override below. */
+    if (!customElements.get('hca-controls')) {
+      customElements.define('hca-controls', class extends HTMLElement {
+        constructor() {
+          super();
+          this._open = false;
+          this._hass = null;
+          this._cfg  = {};
+          this.attachShadow({ mode: 'open' });
+        }
+
+        set hass(h) { this._hass = h; this._render(); }
+        set config(c) { this._cfg = c || {}; }
+
+        _svc(domain, service, data) {
+          if (this._hass) this._hass.callService(domain, service, data);
+        }
+
+        _toggle() { this._open = !this._open; this._render(); }
+
+        _render() {
+          const h    = this._hass;
+          const c    = this._cfg;
+          const lang = (h && h.language) || 'en';
+          const tr   = k => { try { return Lt(k, lang); } catch (_) { return k; } };
+
+          const climEid  = c.entity || 'climate.comfoair';
+          const balEid   = 'select.comfoair_fan_balance';
+          const boostEid = 'number.comfoair_boost_ventilation_minutes';
+          const errEid   = 'button.comfoair_error_reset';
+          const filtEid  = 'button.comfoair_filter_reset';
+
+          const clim    = h && h.states[climEid];
+          const fanMode = clim && clim.attributes.fan_mode;
+          const temp    = clim && clim.attributes.temperature;
+          const minT    = (clim && clim.attributes.min_temp) || 12;
+          const maxT    = (clim && clim.attributes.max_temp) || 27;
+
+          const balSt   = h && h.states[balEid];
+          const bal     = balSt && balSt.state;
+
+          const boostSt  = h && h.states[boostEid];
+          const boost    = boostSt != null ? Number(boostSt.state) : null;
+          const boostMax = (boostSt && Number(boostSt.attributes.max)) || 60;
+
+          const fanModes = [
+            ['off',    tr('fan_off')],
+            ['low',    tr('fan_low')],
+            ['medium', tr('fan_medium')],
+            ['high',   tr('fan_high')],
+            ['auto',   'Auto'],
+          ];
+          const balModes = [
+            ['balanced',     tr('bal_balanced')],
+            ['supply_only',  tr('bal_supply')],
+            ['exhaust_only', tr('bal_exhaust')],
+          ];
+
+          const btns = (modes, cur, act) => modes.map(([v, lbl]) =>
+            `<button class="btn${cur === v ? ' active' : ''}" data-a="${act}" data-v="${v}">${lbl}</button>`
+          ).join('');
+
+          const rows = [
+            `<div class="row">
+              <span class="lbl">${tr('ctrl_fan_level')}</span>
+              <div class="grp">${btns(fanModes, fanMode, 'fan')}</div>
+            </div>`,
+            `<div class="row">
+              <span class="lbl">${tr('ctrl_temperature')}</span>
+              <div class="grp tctrl">
+                <button class="btn" data-a="temp" data-v="-1">−</button>
+                <span class="tval">${temp != null ? temp + ' °C' : '—'}</span>
+                <button class="btn" data-a="temp" data-v="1">＋</button>
+              </div>
+            </div>`,
+            balSt ? `<div class="row">
+              <span class="lbl">${tr('ctrl_fan_balance')}</span>
+              <div class="grp">${btns(balModes, bal, 'bal')}</div>
+            </div>` : '',
+            boost != null ? `<div class="row">
+              <span class="lbl">${tr('ctrl_boost')}</span>
+              <div class="grp tctrl">
+                <button class="btn"${boost <= 0 ? ' disabled' : ''} data-a="boost" data-v="-5">−5</button>
+                <span class="tval">${boost} ${tr('min_suffix')}</span>
+                <button class="btn"${boost >= boostMax ? ' disabled' : ''} data-a="boost" data-v="5">+5</button>
+              </div>
+            </div>` : '',
+            `<div class="row">
+              <span class="lbl"></span>
+              <div class="grp">
+                <button class="btn err" data-a="reset-err">${tr('ctrl_reset_errors')}</button>
+                <button class="btn err" data-a="reset-flt">${tr('ctrl_reset_filter')}</button>
+              </div>
+            </div>`,
+          ].join('');
+
+          this.shadowRoot.innerHTML = `
+            <style>
+              :host { display:block; border-top:1px solid var(--divider-color,#e0e0e0); }
+              .hdr { display:flex; align-items:center; justify-content:space-between;
+                     padding:8px 16px; cursor:pointer; user-select:none;
+                     color:var(--secondary-text-color); font-size:13px; font-weight:500; }
+              .chev { width:20px; height:20px; transition:transform .2s;
+                      transform:rotate(${this._open ? 180 : 0}deg); }
+              .panel { display:${this._open ? 'block' : 'none'}; padding:0 16px 8px; }
+              .row { display:flex; align-items:center; justify-content:space-between;
+                     padding:6px 0; border-top:1px solid var(--divider-color,#e0e0e0); }
+              .lbl { font-size:13px; color:var(--primary-text-color); min-width:110px; }
+              .grp { display:flex; gap:4px; flex-wrap:wrap; justify-content:flex-end; }
+              .tctrl { align-items:center; gap:6px; }
+              .tval { font-size:14px; font-weight:500; min-width:52px; text-align:center;
+                      color:var(--primary-text-color); }
+              .btn { padding:4px 10px; border-radius:4px; cursor:pointer;
+                     border:1px solid var(--divider-color,#ddd);
+                     background:transparent; color:var(--primary-text-color);
+                     font-size:12px; transition:background .15s,color .15s; }
+              .btn:hover:not([disabled]) { background:var(--secondary-background-color); }
+              .btn.active { background:var(--primary-color); color:var(--text-primary-color,#fff);
+                            border-color:var(--primary-color); }
+              .btn.err { color:var(--error-color,#f44336); border-color:var(--error-color,#f44336); }
+              .btn.err:hover { background:var(--error-color,#f44336); color:#fff; }
+              .btn[disabled] { opacity:.4; cursor:default; pointer-events:none; }
+            </style>
+            <div class="hdr" id="_hdr">
+              <span>${tr('ctrl_controls')}</span>
+              <svg class="chev" viewBox="0 0 24 24">
+                <path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/>
+              </svg>
+            </div>
+            <div class="panel">${rows}</div>`;
+
+          this.shadowRoot.getElementById('_hdr').onclick = () => this._toggle();
+          this.shadowRoot.querySelectorAll('.btn[data-a]').forEach(b => {
+            b.onclick = e => {
+              e.stopPropagation();
+              const a = b.dataset.a, v = b.dataset.v;
+              if (a === 'fan') {
+                this._svc('climate', 'set_fan_mode', { entity_id: climEid, fan_mode: v });
+              } else if (a === 'temp') {
+                const nt = Math.max(minT, Math.min(maxT, (temp || minT) + Number(v)));
+                this._svc('climate', 'set_temperature', { entity_id: climEid, temperature: nt });
+              } else if (a === 'bal') {
+                this._svc('select', 'select_option', { entity_id: balEid, option: v });
+              } else if (a === 'boost') {
+                this._svc('number', 'set_value', { entity_id: boostEid, value: Math.max(0, Math.min(boostMax, boost + Number(v))) });
+              } else if (a === 'reset-err') {
+                this._svc('button', 'press', { entity_id: errEid });
+              } else if (a === 'reset-flt') {
+                this._svc('button', 'press', { entity_id: filtEid });
+              }
+            };
+          });
+        }
+      });
+    }
+
+    // Inject / refresh the controls panel after each Lit render cycle.
+    const _upd = _ca.prototype.updated;
+    _ca.prototype.updated = function (changed) {
+      if (_upd) _upd.call(this, changed);
+      const card = this.renderRoot && this.renderRoot.querySelector('ha-card');
+      if (!card) return;
+      let panel = card.querySelector('hca-controls');
+      if (!panel) {
+        panel = document.createElement('hca-controls');
+        const ver = card.querySelector('.hca-ver');
+        if (ver) card.insertBefore(panel, ver);
+        else card.appendChild(panel);
+      }
+      panel.config = this._config;
+      panel.hass   = this.hass;
+    };
 
     /* Version badge: appended once to ha-card after first render */
     const _fu = _ca.prototype.firstUpdated;
