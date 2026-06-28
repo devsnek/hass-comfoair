@@ -539,7 +539,12 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # 0xCE level table — always polled; low at/below the absent floor == parked.
         e_low, e_abs = s.get("return_air_level_low"), s.get("return_air_level_absent")
         sp_low, sp_abs = s.get("supply_air_level_low"), s.get("supply_air_level_absent")
-        if None not in (e_low, e_abs, sp_low, sp_abs):
+        if (
+            e_low is not None
+            and e_abs is not None
+            and sp_low is not None
+            and sp_abs is not None
+        ):
             known = True
             exhaust_off |= e_low <= e_abs
             supply_off |= sp_low <= sp_abs
