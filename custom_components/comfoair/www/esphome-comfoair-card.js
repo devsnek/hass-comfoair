@@ -260,6 +260,33 @@ const pt=t=>(e,i)=>{void 0!==i?i.addInitializer(()=>{customElements.define(t,e)}
 {
   const _ca = customElements.get('esphome-comfoair-card');
   if (_ca) {
+    const _VER = 'v0.16.3-hca.1';
+
+    /* Version badge: appended once to ha-card after first render */
+    const _fu = _ca.prototype.firstUpdated;
+    _ca.prototype.firstUpdated = function (ch) {
+      if (_fu) _fu.call(this, ch);
+      const card = this.renderRoot && this.renderRoot.querySelector('ha-card');
+      if (card && !card.querySelector('.hca-ver')) {
+        const el = document.createElement('div');
+        el.className = 'hca-ver';
+        el.textContent = _VER;
+        el.style.cssText = [
+          'text-align:right',
+          'font-size:9.5px',
+          'font-family:monospace',
+          'font-weight:600',
+          'letter-spacing:0.04em',
+          'opacity:0.30',
+          'padding:2px 16px 8px',
+          'color:var(--secondary-text-color)',
+          'pointer-events:none',
+          'user-select:none',
+        ].join(';');
+        card.appendChild(el);
+      }
+    };
+
     const _sc = _ca.prototype.setConfig;
     _ca.prototype.setConfig = function (cfg) {
       cfg = cfg || {};
