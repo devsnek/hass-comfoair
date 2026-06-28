@@ -1,0 +1,125 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "ComfoAir",
+        "description": "Sélectionnez le port série auquel le ComfoAir est connecté.",
+        "data": {
+          "port": "Port série"
+        }
+      },
+      "manual_path": {
+        "title": "Saisir le chemin du port série",
+        "description": "Entrez le chemin complet vers le périphérique série.",
+        "data": {
+          "port": "Port série"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Impossible d'ouvrir le port série.",
+      "no_response": "Aucune réponse de l'unité de ventilation."
+    },
+    "abort": {
+      "already_configured": "Ce port série est déjà configuré."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "supply_fan_speed": { "name": "Vitesse ventilateur soufflage" },
+      "return_fan_speed": { "name": "Vitesse ventilateur reprise" },
+      "supply_fan_speed_rpm": { "name": "Vitesse ventilateur soufflage (tr/min)" },
+      "return_fan_speed_rpm": { "name": "Vitesse ventilateur reprise (tr/min)" },
+      "ventilation_level": { "name": "Niveau de ventilation" },
+      "return_air_level": { "name": "Niveau air repris" },
+      "supply_air_level": { "name": "Niveau air soufflé" },
+      "outside_air_temperature": { "name": "Température air extérieur" },
+      "supply_air_temperature": { "name": "Température air soufflé" },
+      "return_air_temperature": { "name": "Température air repris" },
+      "exhaust_air_temperature": { "name": "Température air extrait" },
+      "level0_hours": { "name": "Heures niveau 0" },
+      "level1_hours": { "name": "Heures niveau 1" },
+      "level2_hours": { "name": "Heures niveau 2" },
+      "level3_hours": { "name": "Heures niveau 3" },
+      "frost_protection_hours": { "name": "Heures protection gel" },
+      "filter_hours": { "name": "Heures filtre" },
+      "filter_status": { "name": "État du filtre" },
+      "current_errors": { "name": "Erreurs actuelles" },
+      "last_errors": { "name": "Dernières erreurs" },
+      "second_last_errors": { "name": "Avant-dernières erreurs" },
+      "third_last_errors": { "name": "Erreurs N-3" },
+      "bypass_valve": { "name": "Vanne bypass" },
+      "bypass_factor": { "name": "Facteur bypass" },
+      "bypass_step": { "name": "Pas bypass" },
+      "bypass_correction": { "name": "Correction bypass" },
+      "bypass_open_hours": { "name": "Heures bypass ouvert" },
+      "motor_current_bypass": { "name": "Courant moteur bypass" },
+      "motor_current_preheating": { "name": "Courant moteur préchauffage" },
+      "preheating_hours": { "name": "Heures préchauffage" },
+      "frost_protection_minutes": { "name": "Minutes protection gel" },
+      "preheating_valve": { "name": "Vanne préchauffage" },
+      "frost_protection_level": { "name": "Niveau protection gel" },
+      "enthalpy_temperature": { "name": "Température enthalpie" },
+      "ewt_temperature": { "name": "Température EWT" },
+      "reheating_temperature": { "name": "Température postchauffage" },
+      "kitchen_hood_temperature": { "name": "Température hotte de cuisine" },
+      "analog_input_1": { "name": "Entrée analogique 1" },
+      "analog_input_2": { "name": "Entrée analogique 2" },
+      "analog_input_3": { "name": "Entrée analogique 3" },
+      "analog_input_4": { "name": "Entrée analogique 4" },
+      "postheating_power": { "name": "Puissance postchauffage" },
+      "postheating_power_i": { "name": "Puissance postchauffage I" }
+    },
+    "binary_sensor": {
+      "supply_fan_active": { "name": "Ventilateur soufflage actif" },
+      "frost_protection_active": { "name": "Protection gel active" },
+      "summer_mode": { "name": "Mode été" },
+      "bypass_valve_open": { "name": "Vanne bypass ouverte" },
+      "preheating_state": { "name": "État préchauffage" },
+      "step_switch_l1": { "name": "Contacteur de niveau L1" },
+      "step_switch_l2": { "name": "Contacteur de niveau L2" },
+      "bathroom_switch": { "name": "Contacteur salle de bain" },
+      "bathroom_switch_2": { "name": "Contacteur salle de bain 2" },
+      "external_filter_switch": { "name": "Contacteur filtre externe" },
+      "heat_recovery_switch": { "name": "Contacteur récupération chaleur" },
+      "kitchen_hood_switch": { "name": "Contacteur hotte de cuisine" }
+    },
+    "number": {
+      "return_air_level_absent": { "name": "Niveau air repris – absent" },
+      "return_air_level_low": { "name": "Niveau air repris – bas" },
+      "return_air_level_medium": { "name": "Niveau air repris – moyen" },
+      "return_air_level_high": { "name": "Niveau air repris – élevé" },
+      "supply_air_level_absent": { "name": "Niveau air soufflé – absent" },
+      "supply_air_level_low": { "name": "Niveau air soufflé – bas" },
+      "supply_air_level_medium": { "name": "Niveau air soufflé – moyen" },
+      "supply_air_level_high": { "name": "Niveau air soufflé – élevé" },
+      "bathroom_switch_on_delay_minutes": { "name": "Délai activation salle de bain" },
+      "bathroom_switch_off_delay_minutes": { "name": "Délai désactivation salle de bain" },
+      "l1_switch_off_delay_minutes": { "name": "Délai désactivation L1" },
+      "boost_ventilation_minutes": { "name": "Ventilation boost" },
+      "filter_warning_weeks": { "name": "Semaines avant alerte filtre" },
+      "rf_high_time_short_minutes": { "name": "RF temps haut court" },
+      "rf_high_time_long_minutes": { "name": "RF temps haut long" },
+      "extractor_hood_switch_off_delay_minutes": { "name": "Délai désactivation hotte" },
+      "ewt_low_temperature": { "name": "Température EWT basse" },
+      "ewt_high_temperature": { "name": "Température EWT haute" },
+      "ewt_speed_up": { "name": "Accélération EWT" },
+      "kitchen_hood_speed_up": { "name": "Accélération hotte de cuisine" },
+      "postheating_target_temperature": { "name": "Température cible postchauffage" }
+    },
+    "button": {
+      "filter_reset": { "name": "Réinitialiser filtre" },
+      "error_reset": { "name": "Réinitialiser erreurs" }
+    },
+    "select": {
+      "fan_balance": {
+        "name": "Équilibrage ventilateurs",
+        "state": {
+          "balanced": "Équilibré",
+          "supply_only": "Soufflage seul",
+          "exhaust_only": "Reprise seule"
+        }
+      }
+    }
+  }
+}
