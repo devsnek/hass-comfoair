@@ -67,7 +67,7 @@ const pt=t=>(e,i)=>{void 0!==i?i.addInitializer(()=>{customElements.define(t,e)}
       ha-expansion-panel { margin-top: 8px; }
     `}};t([mt({attribute:!1})],It.prototype,"hass",void 0),t([ft()],It.prototype,"_config",void 0),t([ft()],It.prototype,"_detectedCount",void 0),It=t([pt($t)],It),console.info("%c ESPHOME-COMFOAIR-CARD %c 0.16.3 ","color:orange;font-weight:bold;background:black","color:white;font-weight:bold;background:dimgray"),window.customCards=window.customCards||[],window.customCards.push({type:bt,name:"ComfoAir Card",preview:!1,description:"Counter-flow heat-exchanger card for the hass-comfoair integration."});const Dt="M6,19 H120 L320,113 H434",Bt="M434,19 H320 L120,113 H6";let Wt=class extends ct{static async getConfigElement(){return document.createElement($t)}static getStubConfig(t){if(!t)return{entity:""};const e=Object.keys(t.states).find(t=>t.startsWith("climate.")&&/comfo|ca\d{3}|wtw/i.test(t));return e?{entity:e,animation:"static",animation_speed_source:"fixed",animation_speed:50,color_scale:"auto",temp_min:-10,temp_max:30,...Rt(t,e)}:{entity:""}}setConfig(t){if(!t)throw new Error(Lt("invalid_config",this.hass?.language));this._config=t}getCardSize(){return 5}shouldUpdate(t){if(t.has("_config"))return!0;const e=t.get("hass");if(!e||!this._config)return!0;const i=this._config,s=wt.map(t=>i[t]).filter(t=>!!t);return s.some(t=>e.states[t]!==this.hass.states[t])}render(){if(!this.hass||!this._config)return W``;const t=this._config,e=this.hass,i=At(e,t.entity);if(!i)return W`<ha-card>
         <hui-warning>${Lt("no_entity",this.hass.language)}: ${t.entity||"—"}</hui-warning>
-      </ha-card>`;const s=i.attributes.fan_mode,n=s?.toLowerCase(),r=i.attributes.temperature,o="animated"===t.animation,a="fixed"===t.color_scale?"fixed":"auto",l=!!n&&"off"!==n,c=Et(e,t.tempSensor1),d=Et(e,t.tempSensor2),p=Et(e,t.tempSensor3),h=Et(e,t.tempSensor4),u=function(t,e="auto",i=-10,s=30){if("fixed"===e)return[i,s];const n=t.filter(t=>null!=t&&!Number.isNaN(t));if(0===n.length)return[i,s];let r=Math.min(...n),o=Math.max(...n);if(o-r<4){const t=(o+r)/2;r=t-2,o=t+2}const a=.12*(o-r);return[r-a,o+a]}([c,d,p,h],a,Number.isFinite(Number(t.temp_min))?Number(t.temp_min):-10,Number.isFinite(Number(t.temp_max))?Number(t.temp_max):30),[m,f,g,_]=[c,d,p,h].map(t=>function(t,e){if(null==t||Number.isNaN(t))return"var(--disabled-text-color, #888)";const[i,s]=e;return Mt((t-i)/(s-i||1))}(t,u));let v=1,b=1;if(o){const i="level"===t.animation_speed_source?"level":"fixed";v=qt(e,t,i,t.supply_air_level),b=qt(e,t,i,t.return_air_level)}const $=(3/v).toFixed(1),y=(3/b).toFixed(1),x=At(e,t.bypass_valve)?.state,w="on"===x?null:function(t,e,i){if(null==t||null==e||null==i)return null;const s=e-t;if(s<=.5)return null;const n=(i-t)/s;return n<=0?null:Math.round(100*Math.min(1,n))}(c,p,h),A=[Nt("fan",void 0,s),Nt("filter",At(e,t.filterstatus)?.state),Nt("bypass",x),Nt("preheat",At(e,t.preheat)?.state),Nt("season",At(e,t.summer_mode)?.state)],S=t=>t.replace(".",","),E=(t,i)=>W`<div class="tempbadge ${i?"clickable":""}" style=${`--fg:${t};--bd:color-mix(in srgb, ${t} 45%, transparent);--bg:color-mix(in srgb, ${t} 14%, transparent)`} @click=${()=>this._moreInfo(i)} title=${i?"Verlauf anzeigen":""}><span class="v">${S(St(e,i))}</span><span class="u">°C</span></div>`,C=(t,i)=>{const s=Et(e,t)??0,n=o&&l&&s>0;return W`<div class="subt ${t?"clickable":""}" @click=${()=>this._moreInfo(t)}>
+      </ha-card>`;const s=i.attributes.fan_mode,n=s?.toLowerCase(),r=i.attributes.temperature,o="animated"===t.animation,a="fixed"===t.color_scale?"fixed":"auto",l=!!n&&"off"!==n,c=Et(e,t.tempSensor1),d=Et(e,t.tempSensor2),p=Et(e,t.tempSensor3),h=Et(e,t.tempSensor4),u=function(t,e="auto",i=-10,s=30){if("fixed"===e)return[i,s];const n=t.filter(t=>null!=t&&!Number.isNaN(t));if(0===n.length)return[i,s];let r=Math.min(...n),o=Math.max(...n);if(o-r<4){const t=(o+r)/2;r=t-2,o=t+2}const a=.12*(o-r);return[r-a,o+a]}([c,d,p,h],a,Number.isFinite(Number(t.temp_min))?Number(t.temp_min):-10,Number.isFinite(Number(t.temp_max))?Number(t.temp_max):30),[m,f,g,_]=[c,d,p,h].map(t=>function(t,e){if(null==t||Number.isNaN(t))return"var(--disabled-text-color, #888)";const[i,s]=e;return Mt((t-i)/(s-i||1))}(t,u));let v=1,b=1;if(o){const i="level"===t.animation_speed_source?"level":"fixed";v=qt(e,t,i,t.supply_air_level),b=qt(e,t,i,t.return_air_level)}const $=(3/v).toFixed(1),y=(3/b).toFixed(1),x=At(e,t.bypass_valve)?.state,w="on"===x?null:function(t,e,i){if(null==t||null==e||null==i)return null;const s=e-t;if(s<=.5)return null;const n=(i-t)/s;return n<=0?null:Math.round(100*Math.min(1,n))}(c,p,h),A=[Nt("fan",void 0,s),Nt("filter",At(e,t.filterstatus)?.state),Nt("bypass",x),Nt("preheat",At(e,t.preheat)?.state),Nt("season",At(e,t.summer_mode)?.state)],S=t=>t.replace(".",","),E=(t,i)=>W`<div class="tempbadge ${i?"clickable":""}" style=${`--fg:${t};--bd:color-mix(in srgb, ${t} 45%, transparent);--bg:color-mix(in srgb, ${t} 14%, transparent)`} @click=${()=>this._moreInfo(i)} title=${i?"Show history":""}><span class="v">${S(St(e,i))}</span><span class="u">°C</span></div>`,C=(t,i)=>{const s=Et(e,t)??0,n=o&&l&&s>0;return W`<div class="subt ${t?"clickable":""}" @click=${()=>this._moreInfo(t)}>
         <ha-icon class=${n?"spinico spin":"spinico"} style=${n?`animation-duration:${(1.6/i).toFixed(2)}s`:""} icon="mdi:fan"></ha-icon>
         <span>${St(e,t)}</span>&nbsp;rpm
       </div>`},k=t=>W`<div class="subt ${t?"clickable":""}" @click=${()=>this._moreInfo(t)}>
@@ -254,13 +254,241 @@ const pt=t=>(e,i)=>{void 0!==i?i.addInitializer(()=>{customElements.define(t,e)}
     `}};function qt(t,e,i,s){return function(t,e,i){if("level"===t){const t=null==i||Number.isNaN(i)?50:i;return Math.min(2.5,Math.max(.2,t/50))}const s=null==e||Number.isNaN(e)?50:e;return Math.min(2,Math.max(.1,s/100))}(i,e.animation_speed,Et(t,s))}t([mt({attribute:!1})],Wt.prototype,"hass",void 0),t([ft()],Wt.prototype,"_config",void 0),Wt=t([pt(bt)],Wt);
 
 /* ── hass-comfoair defaults ──────────────────────────────────────────────────
- * Patch setConfig so a card with no explicit entity config still works out of
- * the box.  Explicit YAML overrides always win (spread order: defaults first).
+ * Patches applied after the TimWeyand bundle runs:
+ *  • i18n        – all user-visible strings keyed in _STRINGS; merged into Ht
+ *  • xt / Ft     – fan-mode + editor field labels updated to English (default)
+ *  • jt          – filterstatus entity picker fixed to domain "sensor"
+ *  • _mainSchema – editor select options localised via Lt()
+ *  • _label      – recomputed each render cycle using the HA UI language
+ *  • firstUpdated – version badge appended to ha-card once after first render
+ *  • setConfig   – injects hass-comfoair entity defaults (no YAML required)
+ *
+ * To add a language: add an entry to _STRINGS and bump _VER.
+ * Missing keys in a locale fall back to "en" automatically (via Lt).
  * ─────────────────────────────────────────────────────────────────────────── */
 {
   const _ca = customElements.get('esphome-comfoair-card');
   if (_ca) {
-    const _VER = 'v0.16.3-hca.1';
+    const _VER = 'v0.16.3-hca.2';
+
+    // ── i18n string table ─────────────────────────────────────────────────────
+    const _STRINGS = {
+      en: {
+        // Editor messages
+        invalid_config: 'Invalid configuration',
+        no_entity:      'No climate entity defined',
+        detected:       'entities detected',
+        advanced:       'Advanced / manual mapping',
+        // Editor form field labels  (key = 'fl_' + field.name)
+        fl_entity:                 'CA350/550 Climate Entity (required)',
+        fl_animation:              'Animation',
+        fl_animation_speed_source: 'Speed source',
+        fl_animation_speed:        'Fixed speed (%)',
+        fl_color_scale:            'Colour scale',
+        fl_temp_min:               'Fixed scale – Min (°C)',
+        fl_temp_max:               'Fixed scale – Max (°C)',
+        fl_show_legend:            'Show temperature scale',
+        fl_name:                   'Name (optional)',
+        fl_tempSensor1:            'Outside air temperature',
+        fl_tempSensor2:            'Exhaust air temperature',
+        fl_tempSensor3:            'Return air temperature',
+        fl_tempSensor4:            'Supply air temperature',
+        fl_filterstatus:           'Filter status',
+        fl_bypass_valve:           'Bypass valve',
+        fl_summer_mode:            'Summer mode',
+        fl_preheat:                'Preheat register',
+        fl_fan_speed_supply:       'Supply fan speed',
+        fl_fan_speed_exhaust:      'Return fan speed',
+        fl_return_air_level:       'Return air level',
+        fl_supply_air_level:       'Supply air level',
+        // _mainSchema select option labels
+        opt_animated:    'Animated (airflows + fan)',
+        opt_static:      'Static',
+        opt_speed_fixed: 'Fixed speed (%)',
+        opt_speed_level: 'By air volume (Supply/Return %)',
+        opt_scale_auto:  'Auto (current values)',
+        opt_scale_fixed: 'Fixed (manual range)',
+        // Fan-mode status labels (xt object)
+        fan_off: 'Away', fan_low: 'Level 1', fan_medium: 'Level 2', fan_high: 'Level 3',
+        // Status chip labels and sub-states (Nt function)
+        chip_fan: 'Fan',    chip_filter: 'Filter', chip_bypass: 'Bypass',
+        chip_preheat: 'Preheat', chip_summer: 'Summer', chip_winter: 'Winter',
+        filter_ok: 'OK',         filter_replace: 'Replace',
+        bypass_open: 'Open',     bypass_closed: 'Closed',
+        preheat_active: 'Active', preheat_off: 'Off',
+        // Main card flow labels
+        lbl_outside: 'Outside air', lbl_return: 'Return air',
+        lbl_exhaust: 'Exhaust air', lbl_supply: 'Supply air',
+        heat_recovery: 'Heat recovery',
+        show_history:  'Show history',
+      },
+      it: {
+        invalid_config: 'Configurazione non valida',
+        no_entity:      'Nessuna entità climate definita',
+        detected:       'entità rilevate',
+        advanced:       'Avanzato / mappatura manuale',
+        fl_entity:                 'CA350/550 Entità Climate (obbligatoria)',
+        fl_animation:              'Animazione',
+        fl_animation_speed_source: 'Sorgente velocità',
+        fl_animation_speed:        'Velocità fissa (%)',
+        fl_color_scale:            'Scala colori',
+        fl_temp_min:               'Scala fissa – Min (°C)',
+        fl_temp_max:               'Scala fissa – Max (°C)',
+        fl_show_legend:            'Mostra scala temperatura',
+        fl_name:                   'Nome (opzionale)',
+        fl_tempSensor1:            'Temperatura aria esterna',
+        fl_tempSensor2:            'Temperatura aria espulsa',
+        fl_tempSensor3:            'Temperatura aria di ripresa',
+        fl_tempSensor4:            'Temperatura aria immessa',
+        fl_filterstatus:           'Stato filtro',
+        fl_bypass_valve:           'Valvola bypass',
+        fl_summer_mode:            'Modalità estate',
+        fl_preheat:                'Resistenza preriscaldo',
+        fl_fan_speed_supply:       'Velocità ventilatore mandata',
+        fl_fan_speed_exhaust:      'Velocità ventilatore ripresa',
+        fl_return_air_level:       'Livello aria di ripresa',
+        fl_supply_air_level:       'Livello aria di mandata',
+        opt_animated:    'Animata (flussi + ventilatori)',
+        opt_static:      'Statica',
+        opt_speed_fixed: 'Velocità fissa (%)',
+        opt_speed_level: 'Per portata aria (Mandata/Ripresa %)',
+        opt_scale_auto:  'Automatica (valori correnti)',
+        opt_scale_fixed: 'Fissa (intervallo manuale)',
+        fan_off: 'Assente', fan_low: 'Livello 1', fan_medium: 'Livello 2', fan_high: 'Livello 3',
+        chip_fan: 'Ventil.',      chip_filter: 'Filtro',   chip_bypass: 'Bypass',
+        chip_preheat: 'Preriscald.', chip_summer: 'Estate', chip_winter: 'Inverno',
+        filter_ok: 'OK',          filter_replace: 'Sostituire',
+        bypass_open: 'Aperta',    bypass_closed: 'Chiusa',
+        preheat_active: 'Attivo', preheat_off: 'Off',
+        lbl_outside: 'Aria esterna',   lbl_return: 'Aria di ripresa',
+        lbl_exhaust: 'Aria espulsa',   lbl_supply: 'Aria immessa',
+        heat_recovery: 'Recupero calore',
+        show_history:  'Mostra storico',
+      },
+      de: {
+        invalid_config: 'Ungültige Konfiguration',
+        no_entity:      'Keine climate-Entity ausgewählt',
+        detected:       'Entities erkannt',
+        advanced:       'Erweitert / manuelle Zuordnung',
+        fl_entity:                 'CA350/550 Climate-Entity (Pflicht)',
+        fl_animation:              'Animation',
+        fl_animation_speed_source: 'Tempo-Quelle',
+        fl_animation_speed:        'Festes Tempo (%)',
+        fl_color_scale:            'Farbskala',
+        fl_temp_min:               'Feste Skala – Min (°C)',
+        fl_temp_max:               'Feste Skala – Max (°C)',
+        fl_show_legend:            'Temperaturskala einblenden',
+        fl_name:                   'Name (optional)',
+        fl_tempSensor1:            'Außentemperatur',
+        fl_tempSensor2:            'Fortlufttemperatur',
+        fl_tempSensor3:            'Rücklufttemperatur',
+        fl_tempSensor4:            'Zulufttemperatur',
+        fl_filterstatus:           'Filterstatus',
+        fl_bypass_valve:           'Bypass-Ventil',
+        fl_summer_mode:            'Sommermodus',
+        fl_preheat:                'Vorheizregister',
+        fl_fan_speed_supply:       'Lüfterdrehzahl Zuluft',
+        fl_fan_speed_exhaust:      'Lüfterdrehzahl Fortluft',
+        fl_return_air_level:       'Rückluft-Stufe',
+        fl_supply_air_level:       'Zuluft-Stufe',
+        opt_animated:    'Animiert (Luftströme + Lüfter)',
+        opt_static:      'Statisch',
+        opt_speed_fixed: 'Festes Tempo (%)',
+        opt_speed_level: 'Nach Luftmenge (Supply/Return %)',
+        opt_scale_auto:  'Auto (aktuelle Werte)',
+        opt_scale_fixed: 'Fest (manueller Bereich)',
+        fan_off: 'Aus', fan_low: 'Stufe 1', fan_medium: 'Stufe 2', fan_high: 'Stufe 3',
+        chip_fan: 'Lüfter',    chip_filter: 'Filter',       chip_bypass: 'Bypass',
+        chip_preheat: 'Vorheizen', chip_summer: 'Sommer',       chip_winter: 'Winter',
+        filter_ok: 'OK',           filter_replace: 'Wechseln',
+        bypass_open: 'Offen',      bypass_closed: 'Geschlossen',
+        preheat_active: 'Aktiv',   preheat_off: 'Aus',
+        lbl_outside: 'Außenluft', lbl_return: 'Abluft',
+        lbl_exhaust: 'Fortluft',       lbl_supply: 'Zuluft',
+        heat_recovery: 'Rückgewinnung',
+        show_history:  'Verlauf anzeigen',
+      },
+      nb: {
+        invalid_config: 'Ikke gyldig konfigurasjon',
+        no_entity:      'Ingen climate-enhet valgt',
+        detected:       'enheter funnet',
+        advanced:       'Avansert / manuell tilordning',
+        // remaining keys fall back to English
+      },
+    };
+
+    // Merge into the built-in Ht i18n table (Lt() reads from Ht with en fallback).
+    for (const lang of Object.keys(_STRINGS)) {
+      if (!Ht[lang]) Ht[lang] = {};
+      Object.assign(Ht[lang], _STRINGS[lang]);
+    }
+
+    // ── Fan-mode status labels (xt properties are mutable) ───────────────────
+    xt.off    = _STRINGS.en.fan_off;
+    xt.low    = _STRINGS.en.fan_low;
+    xt.medium = _STRINGS.en.fan_medium;
+    xt.high   = _STRINGS.en.fan_high;
+
+    // ── Editor field labels (Ft properties are mutable) ──────────────────────
+    // Translating Ft updates _label() output for all languages that lack fl_*
+    // entries; languages with fl_* entries are handled live in willUpdate below.
+    for (const key of Object.keys(Ft)) {
+      const v = _STRINGS.en['fl_' + key];
+      if (v !== undefined) Ft[key] = v;
+    }
+
+    // ── Fix filterstatus entity picker domain (should be sensor, not binary_sensor) ──
+    const _fj = jt.find(f => f.name === 'filterstatus');
+    if (_fj) _fj.selector.entity.domain = 'sensor';
+
+    // ── Patch editor: localised field labels + select option labels ───────────
+    const _It = customElements.get('esphome-comfoair-card-editor');
+    if (_It) {
+      // willUpdate() runs before each Lit render; refresh _label with current language.
+      const _wupd = _It.prototype.willUpdate;
+      _It.prototype.willUpdate = function (changed) {
+        if (_wupd) _wupd.call(this, changed);
+        const lang = this.hass?.language ?? 'en';
+        this._label = (field) => Lt('fl_' + field.name, lang);
+      };
+
+      // _mainSchema() rebuilt with localised select option labels.
+      _It.prototype._mainSchema = function () {
+        const lang = this.hass?.language ?? 'en';
+        const tr = (k) => Lt(k, lang);
+        const t = this._config;
+        const schema = [
+          { name: 'entity', required: true, selector: { entity: { domain: 'climate' } } },
+          { name: 'animation', selector: { select: { options: [
+            { value: 'animated', label: tr('opt_animated') },
+            { value: 'static',   label: tr('opt_static') },
+          ]}}},
+        ];
+        if ('animated' === t.animation) {
+          schema.push({ name: 'animation_speed_source', selector: { select: { options: [
+            { value: 'fixed', label: tr('opt_speed_fixed') },
+            { value: 'level', label: tr('opt_speed_level') },
+          ]}}});
+          if ('level' !== t.animation_speed_source) {
+            schema.push({ name: 'animation_speed', selector: { number: {
+              min: 10, max: 200, step: 10, unit_of_measurement: '%', mode: 'slider',
+            }}});
+          }
+        }
+        schema.push({ name: 'color_scale', selector: { select: { options: [
+          { value: 'auto',  label: tr('opt_scale_auto') },
+          { value: 'fixed', label: tr('opt_scale_fixed') },
+        ]}}});
+        if ('fixed' === t.color_scale) {
+          schema.push(
+            { name: 'temp_min', selector: { number: { min: -30, max: 20, step: 1, unit_of_measurement: '°C', mode: 'box' } } },
+            { name: 'temp_max', selector: { number: { min: 0,   max: 50, step: 1, unit_of_measurement: '°C', mode: 'box' } } },
+          );
+        }
+        schema.push({ name: 'show_legend', selector: { boolean: {} } });
+        return schema;
+      };
+    }
 
     /* Version badge: appended once to ha-card after first render */
     const _fu = _ca.prototype.firstUpdated;
@@ -272,16 +500,10 @@ const pt=t=>(e,i)=>{void 0!==i?i.addInitializer(()=>{customElements.define(t,e)}
         el.className = 'hca-ver';
         el.textContent = _VER;
         el.style.cssText = [
-          'text-align:right',
-          'font-size:9.5px',
-          'font-family:monospace',
-          'font-weight:600',
-          'letter-spacing:0.04em',
-          'opacity:0.30',
-          'padding:2px 16px 8px',
-          'color:var(--secondary-text-color)',
-          'pointer-events:none',
-          'user-select:none',
+          'text-align:right', 'font-size:9.5px', 'font-family:monospace',
+          'font-weight:600', 'letter-spacing:0.04em', 'opacity:0.30',
+          'padding:2px 16px 8px', 'color:var(--secondary-text-color)',
+          'pointer-events:none', 'user-select:none',
         ].join(';');
         card.appendChild(el);
       }
