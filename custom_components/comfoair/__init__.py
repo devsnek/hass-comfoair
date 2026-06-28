@@ -28,26 +28,6 @@ PLATFORMS: list[Platform] = [
     Platform.SELECT,
 ]
 
-CARD_URL = "/comfoair/comfoair-card.js"
-_CARD_REGISTERED_KEY = "comfoair_card_registered"
-
-
-async def _async_register_card(hass: HomeAssistant) -> None:
-    """Serve the bundled Lovelace card and load it in the frontend.
-
-    The card ships inside the integration, so installing the integration
-    (e.g. via HACS) is all that is needed — no manual copy to /config/www
-    and no Lovelace resource registration.
-    """
-    if hass.data.get(_CARD_REGISTERED_KEY):
-        return
-    hass.data[_CARD_REGISTERED_KEY] = True
-    card_path = Path(__file__).parent / "www" / "comfoair-card.js"
-    await hass.http.async_register_static_paths(
-        [StaticPathConfig(CARD_URL, str(card_path), cache_headers=False)]
-    )
-    add_extra_js_url(hass, CARD_URL)
-
 
 _UNIQUE_ID_MIGRATIONS = {
     # Renamed for supply/return/outside/exhaust terminology ("intake" fan is supply fan).
@@ -84,8 +64,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     name = entry.title or DEFAULT_NAME
 
     _LOGGER.info("Setting up ComfoAir entry %s on %s", name, port)
-
-    await _async_register_card(hass)
 
     _migrate_unique_ids(hass, entry)
 

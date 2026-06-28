@@ -36,42 +36,8 @@ This diagram shows the wiring used by ComfoAir devices:
 
 ## Lovelace card
 
-The integration bundles a custom dashboard card and registers it automatically —
-no manual copy to `/config/www` and no resource registration needed. After
-installing the integration, just add a card of type `custom:comfoair-card`.
-
-It shows the four air temperatures arranged around the unit, the supply/return
-air levels and fan speeds, status chips (bypass, summer mode, preheating,
-filter), the comfort setpoint with `-`/`+` controls, and ventilation level
-buttons (Away / Low / Medium / High — also cycled by clicking the fan row).
-Clicking any value opens its more-info dialog.
-
-All entity ids are configurable because they depend on the device name (find
-the real ids under Settings → Devices & Services → ComfoAir). Any omitted key
-falls back to a `comfoair`-slug default; entities that do not exist render as
-`—`.
-
-```yaml
-type: custom:comfoair-card
-title: ComfoAir 350
-climate: climate.comfoair
-outside_temp: sensor.comfoair_outside_air_temperature
-supply_temp: sensor.comfoair_supply_air_temperature
-return_temp: sensor.comfoair_return_air_temperature
-exhaust_temp: sensor.comfoair_exhaust_air_temperature
-supply_level: sensor.comfoair_supply_air_level
-return_level: sensor.comfoair_return_air_level
-intake_fan: sensor.comfoair_supply_fan_speed
-exhaust_fan: sensor.comfoair_return_fan_speed
-bypass: binary_sensor.comfoair_bypass_valve_open
-summer_mode: binary_sensor.comfoair_summer_mode
-preheating: binary_sensor.comfoair_preheating_state
-filter_status: sensor.comfoair_filter_status
-temp_step: 1          # °C step for the comfort +/- buttons
-```
-
-The card also supports an optional Fan Balance select (`fan_balance` config
-key); the control is only rendered when such an entity exists.
+https://github.com/TimWeyand/lovelace-comfoair is recommended. After installing
+it should "just work" with this component.
 
 ## ESPHome serial bridge
 
