@@ -1,8 +1,8 @@
 /*
- * ComfoAir Lovelace card — SVG airflow diagram (ESPHome serial-bridge variant)
- * ─────────────────────────────────────────────────────────────────────────────
- * A self-contained (no build step) custom card that visualises the ventilation
- * unit with a counter-flow heat-exchanger diagram:
+ * ComfoAir Lovelace card — SVG airflow diagram
+ * ─────────────────────────────────────────────
+ * A self-contained (no build step) custom card that visualises the
+ * ventilation unit with a counter-flow heat-exchanger diagram:
  *   • four air temperatures colour-coded from blue (cold) to red (warm)
  *   • two fan icons that spin proportionally to RPM via SMIL animation
  *   • ventilation level buttons (Away / Low / Medium / High)
@@ -13,199 +13,200 @@
  * All entity ids are configurable; the defaults assume a device slug of
  * "comfoair" and must usually be edited to match the actual device name.
  *
- * Fan speed animation uses the RPM sensors.  Point `supply_fan` / `return_fan`
- * at `sensor.comfoair_supply_fan_speed_rpm` (or the `_speed` percentage variant
- * if RPM sensors are unavailable — the animation will still work, just scaled
- * differently).
+ * Fan speed animation uses the RPM sensors.  Point `supply_fan` /
+ * `return_fan` at `sensor.comfoair_supply_fan_speed_rpm` (or the `_speed`
+ * percentage variant if RPM sensors are unavailable — the animation will
+ * still work, just scaled differently).
  *
- * Installation: none — the card ships with the integration, which serves it at
- * /comfoair/esphome-comfoair-card.js and loads it into the frontend
- * automatically.  Add a card of type "custom:esphome-comfoair-card" to a
- * dashboard.
+ * Installation: none — the card ships with the integration, which serves it
+ * at /comfoair/esphome-comfoair-card.js and loads it into the frontend automatically.
+ * Add a card of type "custom:esphome-comfoair-card" to a dashboard.
  */
 
-(function () {
-  const DEFAULTS = {
-    title:         "ComfoAir",
-    climate:       "climate.comfoair",
-    outside_temp:  "sensor.comfoair_outside_air_temperature",
-    supply_temp:   "sensor.comfoair_supply_air_temperature",
-    return_temp:   "sensor.comfoair_return_air_temperature",
-    exhaust_temp:  "sensor.comfoair_exhaust_air_temperature",
-    supply_level:  "sensor.comfoair_supply_air_level",
-    return_level:  "sensor.comfoair_return_air_level",
-    supply_fan:    "sensor.comfoair_supply_fan_speed_rpm",
-    return_fan:    "sensor.comfoair_return_fan_speed_rpm",
-    bypass:        "binary_sensor.comfoair_bypass_valve_open",
-    summer_mode:   "binary_sensor.comfoair_summer_mode",
-    preheating:    "binary_sensor.comfoair_preheating_state",
-    filter_status: "sensor.comfoair_filter_status",
-    fan_balance:   null,   // optional, e.g. "select.comfoair_fan_balance"
-    temp_step:     1,
-  };
+const DEFAULTS = {
+  title:         "ComfoAir",
+  climate:       "climate.comfoair",
+  outside_temp:  "sensor.comfoair_outside_air_temperature",
+  supply_temp:   "sensor.comfoair_supply_air_temperature",
+  return_temp:   "sensor.comfoair_return_air_temperature",
+  exhaust_temp:  "sensor.comfoair_exhaust_air_temperature",
+  supply_level:  "sensor.comfoair_supply_air_level",
+  return_level:  "sensor.comfoair_return_air_level",
+  supply_fan:    "sensor.comfoair_supply_fan_speed_rpm",
+  return_fan:    "sensor.comfoair_return_fan_speed_rpm",
+  bypass:        "binary_sensor.comfoair_bypass_valve_open",
+  summer_mode:   "binary_sensor.comfoair_summer_mode",
+  preheating:    "binary_sensor.comfoair_preheating_state",
+  filter_status: "sensor.comfoair_filter_status",
+  fan_balance:   null,   // optional, e.g. "select.comfoair_fan_balance"
+  temp_step:     1,
+};
 
-  const FAN_MODE_LABELS = { off: "Away", low: "Low", medium: "Medium", high: "High" };
+const FAN_MODE_LABELS = { off: "Away", low: "Low", medium: "Medium", high: "High" };
 
-  const FAN_BALANCE_LABELS = {
-    balanced:     "Balanced",
-    supply_only:  "Supply only",
-    exhaust_only: "Exhaust only",
-  };
+const FAN_BALANCE_LABELS = {
+  balanced:     "Balanced",
+  supply_only:  "Supply only",
+  exhaust_only: "Exhaust only",
+};
 
-  // Maps a temperature in °C to an HSL colour string.
-  // -15 °C → blue (hue 240), +10 °C → cyan-green (hue 120), +35 °C → red (hue 0).
-  function tempColor(celsius) {
-    const frac = Math.max(0, Math.min(1, (celsius + 15) / 50));
-    return `hsl(${Math.round(240 - frac * 240)},72%,50%)`;
+// Maps a temperature in °C to an HSL colour string.
+// -15 °C → blue (hue 240), +10 °C → cyan-green (hue 120), +35 °C → red (hue 0).
+function _tempColor(celsius) {
+  const frac = Math.max(0, Math.min(1, (celsius + 15) / 50));
+  return `hsl(${Math.round(240 - frac * 240)},72%,50%)`;
+}
+
+// SVG 3-blade fan path (blades sweep clockwise from the top).
+// Drawn at local (0,0) so <animateTransform> can rotate it in place.
+const _BLADE_PATH =
+  "M 0,0 C -1,-4 -4,-8 0,-10 C 4,-8 3,-3 0,0 Z";
+
+class ComfoAirCard extends HTMLElement {
+  setConfig(config) {
+    this._cfg  = { ...DEFAULTS, ...(config || {}) };
+    this._built = false;
+    this._sig   = null;
   }
 
-  // SVG 3-blade fan path drawn at local (0,0).
-  const BLADE = "M 0,0 C -1,-4 -4,-8 0,-10 C 4,-8 3,-3 0,0 Z";
+  set hass(hass) {
+    this._hass = hass;
+    this._render();
+  }
 
-  class ESPHomeComfoAirCard extends HTMLElement {
-    setConfig(config) {
-      this._cfg   = { ...DEFAULTS, ...(config || {}) };
-      this._built = false;
-      this._sig   = null;
-    }
+  getCardSize() { return 6; }
 
-    set hass(hass) {
-      this._hass = hass;
-      this._render();
-    }
+  // ── helpers ──────────────────────────────────────────────────────────────
 
-    getCardSize() { return 6; }
+  _st(id) {
+    if (!id || !this._hass) return undefined;
+    return this._hass.states[id];
+  }
 
-    // ── helpers ────────────────────────────────────────────────────────────
+  _raw(id) {
+    const s = this._st(id);
+    if (!s || s.state === "unknown" || s.state === "unavailable") return null;
+    const n = parseFloat(s.state);
+    return Number.isNaN(n) ? null : n;
+  }
 
-    _st(id) {
-      if (!id || !this._hass) return undefined;
-      return this._hass.states[id];
-    }
+  _num(id, d = 1) {
+    const s = this._st(id);
+    if (!s || s.state === "unknown" || s.state === "unavailable") return "—";
+    const n = parseFloat(s.state);
+    if (Number.isNaN(n)) return s.state;
+    const u = s.attributes.unit_of_measurement || "";
+    return `${n.toFixed(d)}${u ? " " + u : ""}`;
+  }
 
-    _raw(id) {
-      const s = this._st(id);
-      if (!s || s.state === "unknown" || s.state === "unavailable") return null;
-      const n = parseFloat(s.state);
-      return Number.isNaN(n) ? null : n;
-    }
+  _text(id) {
+    const s = this._st(id);
+    return (!s || s.state === "unknown" || s.state === "unavailable") ? "—" : s.state;
+  }
 
-    _num(id, d = 1) {
-      const s = this._st(id);
-      if (!s || s.state === "unknown" || s.state === "unavailable") return "—";
-      const n = parseFloat(s.state);
-      if (Number.isNaN(n)) return s.state;
-      const u = s.attributes.unit_of_measurement || "";
-      return `${n.toFixed(d)}${u ? " " + u : ""}`;
-    }
+  _isOn(id) {
+    const s = this._st(id);
+    return s ? s.state === "on" : false;
+  }
 
-    _text(id) {
-      const s = this._st(id);
-      return (!s || s.state === "unknown" || s.state === "unavailable") ? "—" : s.state;
-    }
+  _color(id) {
+    const v = this._raw(id);
+    return v != null ? _tempColor(v) : "var(--secondary-text-color)";
+  }
 
-    _isOn(id) {
-      const s = this._st(id);
-      return s ? s.state === "on" : false;
-    }
+  _esc(s) {
+    return String(s ?? "")
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
 
-    _color(id) {
-      const v = this._raw(id);
-      return v != null ? tempColor(v) : "var(--secondary-text-color)";
-    }
+  _moreInfo(id) {
+    if (!id) return;
+    const ev = new Event("hass-more-info", { bubbles: true, composed: true });
+    ev.detail = { entityId: id };
+    this.dispatchEvent(ev);
+  }
 
-    _esc(s) {
-      return String(s ?? "")
-        .replace(/&/g, "&amp;").replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-    }
+  // ── actions ──────────────────────────────────────────────────────────────
 
-    _moreInfo(id) {
-      if (!id) return;
-      const ev = new Event("hass-more-info", { bubbles: true, composed: true });
-      ev.detail = { entityId: id };
-      this.dispatchEvent(ev);
-    }
-
-    // ── actions ────────────────────────────────────────────────────────────
-
-    _setTemp(delta) {
-      const s = this._st(this._cfg.climate);
-      if (!s) return;
-      const cur = Number(s.attributes.temperature);
-      if (!Number.isNaN(cur))
-        this._hass.callService("climate", "set_temperature", {
-          entity_id: this._cfg.climate,
-          temperature: cur + delta * Number(this._cfg.temp_step || 1),
-        });
-    }
-
-    _setFanMode(mode) {
-      if (!mode) return;
-      this._hass.callService("climate", "set_fan_mode", {
-        entity_id: this._cfg.climate, fan_mode: mode,
+  _setTemp(delta) {
+    const s = this._st(this._cfg.climate);
+    if (!s) return;
+    const cur = Number(s.attributes.temperature);
+    if (!Number.isNaN(cur))
+      this._hass.callService("climate", "set_temperature", {
+        entity_id: this._cfg.climate,
+        temperature: cur + delta * Number(this._cfg.temp_step || 1),
       });
-    }
+  }
 
-    _cycleFanMode() {
-      const s = this._st(this._cfg.climate);
-      if (!s) return;
-      const modes = s.attributes.fan_modes || ["off", "low", "medium", "high"];
-      const idx = modes.indexOf(s.attributes.fan_mode);
-      this._setFanMode(modes[(idx + 1) % modes.length]);
-    }
+  _setFanMode(mode) {
+    if (!mode) return;
+    this._hass.callService("climate", "set_fan_mode", {
+      entity_id: this._cfg.climate, fan_mode: mode,
+    });
+  }
 
-    _setBalance(option) {
-      this._hass.callService("select", "select_option", {
-        entity_id: this._cfg.fan_balance, option,
-      });
-    }
+  _cycleFanMode() {
+    const s = this._st(this._cfg.climate);
+    if (!s) return;
+    const modes = s.attributes.fan_modes || ["off", "low", "medium", "high"];
+    const idx = modes.indexOf(s.attributes.fan_mode);
+    this._setFanMode(modes[(idx + 1) % modes.length]);
+  }
 
-    // ── change detection ───────────────────────────────────────────────────
+  _setBalance(option) {
+    this._hass.callService("select", "select_option", {
+      entity_id: this._cfg.fan_balance, option,
+    });
+  }
 
-    _signature() {
-      const keys = [
-        "climate", "outside_temp", "supply_temp", "return_temp", "exhaust_temp",
-        "supply_level", "return_level", "supply_fan", "return_fan",
-        "bypass", "summer_mode", "preheating", "filter_status", "fan_balance",
-      ];
-      return keys.map(k => {
-        const s = this._st(this._cfg[k]);
-        if (!s) return `${k}:∅`;
-        const x = k === "climate"
-          ? `${s.attributes.temperature}/${s.attributes.fan_mode}` : "";
-        return `${k}:${s.state}:${x}`;
-      }).join("|");
-    }
+  // ── change detection ─────────────────────────────────────────────────────
 
-    // ── render ─────────────────────────────────────────────────────────────
+  _signature() {
+    const keys = [
+      "climate", "outside_temp", "supply_temp", "return_temp", "exhaust_temp",
+      "supply_level", "return_level", "supply_fan", "return_fan",
+      "bypass", "summer_mode", "preheating", "filter_status", "fan_balance",
+    ];
+    return keys.map(k => {
+      const s = this._st(this._cfg[k]);
+      if (!s) return `${k}:∅`;
+      const x = k === "climate"
+        ? `${s.attributes.temperature}/${s.attributes.fan_mode}` : "";
+      return `${k}:${s.state}:${x}`;
+    }).join("|");
+  }
 
-    _render() {
-      if (!this._hass || !this._cfg) return;
-      const sig = this._signature();
-      if (this._built && sig === this._sig) return;
-      this._sig = sig;
+  // ── render ───────────────────────────────────────────────────────────────
 
-      const cfg      = this._cfg;
-      const climate  = this._st(cfg.climate);
-      const target   = climate?.attributes.temperature;
-      const current  = climate?.attributes.current_temperature;
-      const fanMode  = climate?.attributes.fan_mode;
-      const fanModes = climate?.attributes.fan_modes ?? ["off", "low", "medium", "high"];
+  _render() {
+    if (!this._hass || !this._cfg) return;
+    const sig = this._signature();
+    if (this._built && sig === this._sig) return;
+    this._sig = sig;
 
-      const supplyRpm = this._raw(cfg.supply_fan) ?? 0;
-      const returnRpm = this._raw(cfg.return_fan) ?? 0;
-      const sDur = supplyRpm > 0 ? Math.max(0.2, Math.min(10, 60 / supplyRpm)).toFixed(2) : null;
-      const rDur = returnRpm > 0 ? Math.max(0.2, Math.min(10, 60 / returnRpm)).toFixed(2) : null;
+    const cfg     = this._cfg;
+    const climate = this._st(cfg.climate);
+    const target  = climate?.attributes.temperature;
+    const current = climate?.attributes.current_temperature;
+    const fanMode = climate?.attributes.fan_mode;
+    const fanModes = climate?.attributes.fan_modes ?? ["off", "low", "medium", "high"];
 
-      const outsideC = this._color(cfg.outside_temp);
-      const supplyC  = this._color(cfg.supply_temp);
-      const returnC  = this._color(cfg.return_temp);
-      const exhaustC = this._color(cfg.exhaust_temp);
+    const supplyRpm = this._raw(cfg.supply_fan) ?? 0;
+    const returnRpm = this._raw(cfg.return_fan) ?? 0;
+    // Rotation period: clamp to [0.2s, 10s].  60/rpm = seconds per revolution.
+    const sDur = supplyRpm > 0 ? Math.max(0.2, Math.min(10, 60 / supplyRpm)).toFixed(2) : null;
+    const rDur = returnRpm > 0 ? Math.max(0.2, Math.min(10, 60 / returnRpm)).toFixed(2) : null;
 
-      const filterFull = this._text(cfg.filter_status).toLowerCase() === "full";
+    const outsideC = this._color(cfg.outside_temp);
+    const supplyC  = this._color(cfg.supply_temp);
+    const returnC  = this._color(cfg.return_temp);
+    const exhaustC = this._color(cfg.exhaust_temp);
 
-      this.innerHTML = `
+    const filterFull = this._text(cfg.filter_status).toLowerCase() === "full";
+
+    this.innerHTML = `
 <ha-card header="${this._esc(cfg.title)}">
 <style>
   .ca { padding: 8px 16px 16px; }
@@ -222,7 +223,10 @@
     color: var(--text-primary-color, #fff);
     border-color: var(--primary-color);
   }
-  .ca-ctrl { display: flex; align-items: center; gap: 6px; margin: 2px 0 6px; cursor: pointer; }
+  .ca-ctrl {
+    display: flex; align-items: center; gap: 6px; margin: 2px 0 6px;
+    cursor: pointer;
+  }
   .ca-setpoint { font-size: 1.3em; font-weight: 700; min-width: 46px; text-align: center; }
   .ca-cur { font-size: .85em; color: var(--secondary-text-color); }
   .ca-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0; }
@@ -262,7 +266,7 @@
     <ha-icon-button class="ca-up" label="Raise temperature">
       <ha-icon icon="mdi:plus"></ha-icon>
     </ha-icon-button>
-    <span class="ca-cur">${current != null ? "now " + current + "°" : ""}</span>
+    <span class="ca-cur">${current != null ? "now " + current + "°" : ""}</span>
   </div>
   <div class="ca-row">
     ${this._chip(cfg.bypass, this._isOn(cfg.bypass), false,
@@ -278,173 +282,179 @@
 </div>
 </ha-card>`;
 
-      this._wire();
-      this._built = true;
-    }
-
-    _chip(id, on, warn, icon, label) {
-      const cls = warn ? "ca-chip warn" : on ? "ca-chip on" : "ca-chip";
-      return `<span class="${cls}" data-e="${id}">` +
-        `<ha-icon icon="${icon}"></ha-icon>${this._esc(label)}</span>`;
-    }
-
-    // ── SVG airflow diagram ─────────────────────────────────────────────────
-    //
-    // Counter-flow layout (viewBox 0 0 300 200):
-    //
-    //  [outside TL]  (supply fan)  (return fan)  [return TR]
-    //        \                                   /
-    //         \__________[unit box]_____________/
-    //         /     (two ribbons cross = X)      \
-    //        /                                    \
-    //  [exhaust BL]                            [supply BR]
-    //
-    // Supply ribbon (fresh air): outside(TL) → unit-TL → unit-BR → supply(BR)
-    // Exhaust ribbon (stale air): return(TR) → unit-TR → unit-BL → exhaust(BL)
-
-    _svg({ outsideC, supplyC, returnC, exhaustC, sDur, rDur, cfg }) {
-      const NO  = [50,  35];    // outside  — top-left
-      const NRE = [250, 35];    // return   — top-right
-      const NEX = [50,  165];   // exhaust  — bottom-left
-      const NSP = [250, 165];   // supply   — bottom-right
-
-      const UX = 110, UY = 70, UW = 80, UH = 60;
-      const TL = [UX,       UY + 10];
-      const TR = [UX + UW,  UY + 10];
-      const BL = [UX,       UY + UH - 10];
-      const BR = [UX + UW,  UY + UH - 10];
-
-      const S0 = [73,  50];    // supply ribbon start
-      const S1 = [227, 150];   // supply ribbon end
-      const R0 = [227, 50];    // exhaust ribbon start
-      const R1 = [73,  150];   // exhaust ribbon end
-
-      const fSX = Math.round((S0[0] + TL[0]) / 2);
-      const fSY = Math.round((S0[1] + TL[1]) / 2);
-      const fRX = Math.round((R0[0] + TR[0]) / 2);
-      const fRY = Math.round((R0[1] + TR[1]) / 2);
-
-      const fan = (x, y, color, dur, entityId) => {
-        const blades = [0, 120, 240].map(a =>
-          `<path d="${BLADE}" fill="${color}" transform="rotate(${a})"/>`
-        ).join("");
-        const anim = dur
-          ? `<animateTransform attributeName="transform" type="rotate"
-               from="0 0 0" to="360 0 0" dur="${dur}s"
-               repeatCount="indefinite" additive="sum"/>`
-          : "";
-        return `<g transform="translate(${x} ${y})" class="ca-node" data-e="${entityId}">
-          <circle r="11" fill="var(--card-background-color)" opacity="0.82"/>
-          ${blades}
-          <circle r="2.5" fill="${color}"/>
-          ${anim}
-        </g>`;
-      };
-
-      return `<svg class="ca-svg" viewBox="0 0 300 200" xmlns="http://www.w3.org/2000/svg"
-        role="img" aria-label="ComfoAir airflow diagram">
-<defs>
-  <linearGradient id="eca-sg" gradientUnits="userSpaceOnUse"
-    x1="${S0[0]}" y1="${S0[1]}" x2="${S1[0]}" y2="${S1[1]}">
-    <stop offset="0%"   stop-color="${outsideC}"/>
-    <stop offset="100%" stop-color="${supplyC}"/>
-  </linearGradient>
-  <linearGradient id="eca-rg" gradientUnits="userSpaceOnUse"
-    x1="${R0[0]}" y1="${R0[1]}" x2="${R1[0]}" y2="${R1[1]}">
-    <stop offset="0%"   stop-color="${returnC}"/>
-    <stop offset="100%" stop-color="${exhaustC}"/>
-  </linearGradient>
-</defs>
-<polyline
-  points="${S0[0]},${S0[1]} ${TL[0]},${TL[1]} ${BR[0]},${BR[1]} ${S1[0]},${S1[1]}"
-  fill="none" stroke="url(#eca-sg)" stroke-width="16"
-  stroke-linejoin="round" stroke-linecap="round"/>
-<polyline
-  points="${R0[0]},${R0[1]} ${TR[0]},${TR[1]} ${BL[0]},${BL[1]} ${R1[0]},${R1[1]}"
-  fill="none" stroke="url(#eca-rg)" stroke-width="16"
-  stroke-linejoin="round" stroke-linecap="round"/>
-<rect x="${UX}" y="${UY}" width="${UW}" height="${UH}" rx="6"
-  fill="none" stroke="var(--divider-color)" stroke-width="2"/>
-${fan(fSX, fSY, outsideC, sDur, cfg.supply_fan)}
-${fan(fRX, fRY, returnC,  rDur, cfg.return_fan)}
-<g class="ca-node" data-e="${cfg.outside_temp}">
-  <text x="${NO[0]}" y="${NO[1] - 10}" text-anchor="middle"
-    fill="var(--secondary-text-color)" font-size="9">Outside</text>
-  <text x="${NO[0]}" y="${NO[1] + 5}" text-anchor="middle"
-    fill="${outsideC}" font-size="14" font-weight="600">${this._esc(this._num(cfg.outside_temp))}</text>
-</g>
-<g class="ca-node" data-e="${cfg.return_temp}">
-  <text x="${NRE[0]}" y="${NRE[1] - 10}" text-anchor="middle"
-    fill="var(--secondary-text-color)" font-size="9">Return</text>
-  <text x="${NRE[0]}" y="${NRE[1] + 5}" text-anchor="middle"
-    fill="${returnC}" font-size="14" font-weight="600">${this._esc(this._num(cfg.return_temp))}</text>
-</g>
-<g class="ca-node" data-e="${cfg.exhaust_temp}">
-  <text x="${NEX[0]}" y="${NEX[1] - 3}" text-anchor="middle"
-    fill="${exhaustC}" font-size="14" font-weight="600">${this._esc(this._num(cfg.exhaust_temp))}</text>
-  <text x="${NEX[0]}" y="${NEX[1] + 12}" text-anchor="middle"
-    fill="var(--secondary-text-color)" font-size="9">Exhaust</text>
-</g>
-<g class="ca-node" data-e="${cfg.supply_temp}">
-  <text x="${NSP[0]}" y="${NSP[1] - 3}" text-anchor="middle"
-    fill="${supplyC}" font-size="14" font-weight="600">${this._esc(this._num(cfg.supply_temp))}</text>
-  <text x="${NSP[0]}" y="${NSP[1] + 12}" text-anchor="middle"
-    fill="var(--secondary-text-color)" font-size="9">Supply</text>
-</g>
-</svg>`;
-    }
-
-    _renderBalance() {
-      const s = this._st(this._cfg.fan_balance);
-      if (!s) return "";
-      const options = s.attributes.options ?? ["balanced", "supply_only", "exhaust_only"];
-      const opts = options.map(o => {
-        const lbl = FAN_BALANCE_LABELS[o] ?? o;
-        return `<option value="${this._esc(o)}"${o === s.state ? " selected" : ""}>${this._esc(lbl)}</option>`;
-      }).join("");
-      return `<div class="ca-balance">
-        <ha-icon icon="mdi:fan"></ha-icon>
-        <span>Fan balance</span>
-        <select class="ca-bal-sel">${opts}</select>
-      </div>`;
-    }
-
-    // ── event wiring ───────────────────────────────────────────────────────
-
-    _wire() {
-      this.querySelectorAll("[data-e]").forEach(el => {
-        const id = el.getAttribute("data-e");
-        if (!id) return;
-        el.addEventListener("click", ev => {
-          if (ev.target.closest(".ca-ctrl") || ev.target.closest(".ca-balance")) return;
-          this._moreInfo(id);
-        });
-      });
-
-      this.querySelectorAll(".ca-level").forEach(b =>
-        b.addEventListener("click", e => {
-          e.stopPropagation();
-          this._setFanMode(b.dataset.mode);
-        })
-      );
-
-      const down = this.querySelector(".ca-down");
-      const up   = this.querySelector(".ca-up");
-      if (down) down.addEventListener("click", e => { e.stopPropagation(); this._setTemp(-1); });
-      if (up)   up.addEventListener("click",   e => { e.stopPropagation(); this._setTemp(+1); });
-
-      const sel = this.querySelector(".ca-bal-sel");
-      if (sel) sel.addEventListener("change", e => this._setBalance(e.target.value));
-    }
+    this._wire();
+    this._built = true;
   }
 
-  customElements.define("esphome-comfoair-card", ESPHomeComfoAirCard);
+  _chip(id, on, warn, icon, label) {
+    const cls = warn ? "ca-chip warn" : on ? "ca-chip on" : "ca-chip";
+    return `<span class="${cls}" data-e="${id}">` +
+      `<ha-icon icon="${icon}"></ha-icon>${this._esc(label)}</span>`;
+  }
 
-  window.customCards ??= [];
-  window.customCards.push({
-    type:        "esphome-comfoair-card",
-    name:        "ComfoAir SVG Card",
-    description: "SVG counter-flow heat-exchanger diagram with gradient ribbons, animated fans, level buttons, status chips and optional Fan Balance.",
-    preview:     false,
-  });
-})();
+  // ── SVG airflow diagram ───────────────────────────────────────────────────
+  //
+  // Layout (viewBox 0 0 300 200):
+  //
+  //   Outside(TL) ─────┐                   ┌───── Return(TR)
+  //                    └──\   [HX box]  /──┘
+  //                        \           /
+  //                        /     ×     \       ← counter-flow crossing
+  //                       /             \
+  //                   ┌──/               \──┐
+  //   Exhaust(BL) ────┘                     └──── Supply(BR)
+  //
+  // Supply ribbon (Outside→Supply, TL→BR): flat → diagonal cross → flat
+  // Exhaust ribbon (Return→Exhaust, TR→BL): flat → diagonal cross → flat
+  // Gradients: outsideC→supplyC and returnC→exhaustC along each ribbon.
+
+  _svg({ outsideC, supplyC, returnC, exhaustC, sDur, rDur, cfg }) {
+    // Node label centres
+    const NO  = [40,  40];   // Outside  — top-left
+    const NRE = [260, 40];   // Return   — top-right
+    const NSP = [260, 162];  // Supply   — bottom-right
+    const NEX = [40,  162];  // Exhaust  — bottom-left
+
+    // Ribbon waypoints: horizontal flat segments meet diagonal at these x coords
+    const py_top = 54;   // y of top flat segments
+    const py_bot = 146;  // y of bottom flat segments
+    const kl = 95;       // x where left horizontal turns diagonal
+    const kr = 205;      // x where right horizontal turns diagonal
+
+    // Fan icon centres: ⅔ along the flat top segment toward the unit
+    const fSX = Math.round(NO[0]  + (kl - NO[0])  * 2 / 3);  // supply fan
+    const fRX = Math.round(NRE[0] - (NRE[0] - kr) * 2 / 3);  // return fan
+
+    const fan = (x, y, color, dur, entityId) => {
+      const blades = [0, 120, 240].map(a =>
+        `<path d="${_BLADE_PATH}" fill="${color}" transform="rotate(${a})"/>`
+      ).join("");
+      const anim = dur
+        ? `<animateTransform attributeName="transform" type="rotate"
+             from="0 0 0" to="360 0 0" dur="${dur}s"
+             repeatCount="indefinite" additive="sum"/>`
+        : "";
+      return `<g transform="translate(${x} ${y})" class="ca-node" data-e="${entityId}">
+        <circle cx="0" cy="0" r="11" fill="var(--card-background-color)" opacity="0.82"/>
+        ${blades}
+        <circle cx="0" cy="0" r="2" fill="${color}"/>
+        ${anim}
+      </g>`;
+    };
+
+    return `<svg class="ca-svg" viewBox="0 0 300 200" xmlns="http://www.w3.org/2000/svg"
+      role="img" aria-label="ComfoAir airflow diagram">
+  <defs>
+    <!-- supply ribbon gradient: outside colour → supply colour, along TL→BR diagonal -->
+    <linearGradient id="eca-sg" gradientUnits="userSpaceOnUse"
+        x1="${NO[0]}" y1="${py_top}" x2="${NSP[0]}" y2="${py_bot}">
+      <stop offset="0%"   stop-color="${outsideC}"/>
+      <stop offset="100%" stop-color="${supplyC}"/>
+    </linearGradient>
+    <!-- exhaust ribbon gradient: return colour → exhaust colour, along TR→BL diagonal -->
+    <linearGradient id="eca-rg" gradientUnits="userSpaceOnUse"
+        x1="${NRE[0]}" y1="${py_top}" x2="${NEX[0]}" y2="${py_bot}">
+      <stop offset="0%"   stop-color="${returnC}"/>
+      <stop offset="100%" stop-color="${exhaustC}"/>
+    </linearGradient>
+  </defs>
+
+  <!-- exhaust ribbon (return → exhaust, TR→BL): drawn first so supply overlaps at cross -->
+  <path d="M${NRE[0]},${py_top} H${kr} L${kl},${py_bot} H${NEX[0]}"
+    fill="none" stroke="url(#eca-rg)" stroke-width="16"
+    stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- supply ribbon (outside → supply, TL→BR) -->
+  <path d="M${NO[0]},${py_top} H${kl} L${kr},${py_bot} H${NSP[0]}"
+    fill="none" stroke="url(#eca-sg)" stroke-width="16"
+    stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- heat exchanger unit box (subtle, around the crossing) -->
+  <rect x="108" y="63" width="84" height="74" rx="5"
+    fill="none" stroke="var(--divider-color)" stroke-width="1.5" opacity="0.55"/>
+
+  <!-- fan icons (on the flat incoming legs) -->
+  ${fan(fSX, py_top, outsideC, sDur, cfg.supply_fan)}
+  ${fan(fRX, py_top, returnC,  rDur, cfg.return_fan)}
+
+  <!-- temperature node labels (clickable) -->
+  <g class="ca-node" data-e="${cfg.outside_temp}">
+    <text x="${NO[0]}" y="${NO[1] - 10}" text-anchor="middle"
+      fill="var(--secondary-text-color)" font-size="9">Outside</text>
+    <text x="${NO[0]}" y="${NO[1] + 5}" text-anchor="middle"
+      fill="${outsideC}" font-size="14" font-weight="600">${this._esc(this._num(cfg.outside_temp))}</text>
+  </g>
+  <g class="ca-node" data-e="${cfg.return_temp}">
+    <text x="${NRE[0]}" y="${NRE[1] - 10}" text-anchor="middle"
+      fill="var(--secondary-text-color)" font-size="9">Return</text>
+    <text x="${NRE[0]}" y="${NRE[1] + 5}" text-anchor="middle"
+      fill="${returnC}" font-size="14" font-weight="600">${this._esc(this._num(cfg.return_temp))}</text>
+  </g>
+  <g class="ca-node" data-e="${cfg.supply_temp}">
+    <text x="${NSP[0]}" y="${NSP[1] - 4}" text-anchor="middle"
+      fill="${supplyC}" font-size="14" font-weight="600">${this._esc(this._num(cfg.supply_temp))}</text>
+    <text x="${NSP[0]}" y="${NSP[1] + 11}" text-anchor="middle"
+      fill="var(--secondary-text-color)" font-size="9">Supply</text>
+  </g>
+  <g class="ca-node" data-e="${cfg.exhaust_temp}">
+    <text x="${NEX[0]}" y="${NEX[1] - 4}" text-anchor="middle"
+      fill="${exhaustC}" font-size="14" font-weight="600">${this._esc(this._num(cfg.exhaust_temp))}</text>
+    <text x="${NEX[0]}" y="${NEX[1] + 11}" text-anchor="middle"
+      fill="var(--secondary-text-color)" font-size="9">Exhaust</text>
+  </g>
+</svg>`;
+  }
+
+  _renderBalance() {
+    const s = this._st(this._cfg.fan_balance);
+    if (!s) return "";
+    const options = s.attributes.options ?? ["balanced", "supply_only", "exhaust_only"];
+    const opts = options.map(o => {
+      const lbl = FAN_BALANCE_LABELS[o] ?? o;
+      return `<option value="${this._esc(o)}"${o === s.state ? " selected" : ""}>${this._esc(lbl)}</option>`;
+    }).join("");
+    return `<div class="ca-balance">
+      <ha-icon icon="mdi:fan"></ha-icon>
+      <span>Fan balance</span>
+      <select class="ca-bal-sel">${opts}</select>
+    </div>`;
+  }
+
+  // ── event wiring ─────────────────────────────────────────────────────────
+
+  _wire() {
+    this.querySelectorAll("[data-e]").forEach(el => {
+      const id = el.getAttribute("data-e");
+      if (!id) return;
+      el.addEventListener("click", ev => {
+        if (ev.target.closest(".ca-ctrl") || ev.target.closest(".ca-balance")) return;
+        this._moreInfo(id);
+      });
+    });
+
+    this.querySelectorAll(".ca-level").forEach(b =>
+      b.addEventListener("click", e => {
+        e.stopPropagation();
+        this._setFanMode(b.dataset.mode);
+      })
+    );
+
+    const down = this.querySelector(".ca-down");
+    const up   = this.querySelector(".ca-up");
+    if (down) down.addEventListener("click", e => { e.stopPropagation(); this._setTemp(-1); });
+    if (up)   up.addEventListener("click",   e => { e.stopPropagation(); this._setTemp(+1); });
+
+    const sel = this.querySelector(".ca-bal-sel");
+    if (sel) sel.addEventListener("change", e => this._setBalance(e.target.value));
+  }
+}
+
+customElements.define("esphome-comfoair-card", ComfoAirCard);
+
+window.customCards ??= [];
+window.customCards.push({
+  type:        "esphome-comfoair-card",
+  name:        "ComfoAir Card",
+  description: "SVG counter-flow heat-exchanger diagram with colour-coded temperatures, animated fan icons, ventilation level buttons, status chips and optional Fan Balance.",
+  preview:     false,
+});
