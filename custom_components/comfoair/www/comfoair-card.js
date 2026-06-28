@@ -294,47 +294,45 @@ class ComfoAirCard extends HTMLElement {
 
   // ── SVG airflow diagram ───────────────────────────────────────────────────
   //
-  // Layout (viewBox 0 0 300 210):
+  // Counter-flow layout (viewBox 0 0 300 200):
   //
-  //   [outside 45,38]               [supply 255,38]
-  //         \   (supply fan≈87,63)      /
-  //          \                         /
-  //       [unit box: 110,72 → 190,128]
-  //          /                         \
-  //         /   (return fan≈212,147)    \
-  //   [exhaust 45,172]              [return 255,172]
+  //  [outside TL]  (supply fan)  (return fan)  [return TR]
+  //        \                                   /
+  //         \__________[unit box]_____________/
+  //         /     (two ribbons cross = X)      \
+  //        /                                    \
+  //  [exhaust BL]                            [supply BR]
   //
-  // Supply (fresh-air) path: outside→unit TL→(cross)→unit TR→supply
-  // Exhaust (stale-air) path: return→unit BR→(cross)→unit BL→exhaust
-  // The X-crossing inside the unit symbolises the counter-flow heat exchanger.
+  // Supply ribbon (fresh air): outside(TL) → unit-TL → unit-BR → supply(BR)
+  // Exhaust ribbon (stale air): return(TR) → unit-TR → unit-BL → exhaust(BL)
+  // The full-width diagonal X represents the counter-flow heat exchanger.
 
   _svg({ outsideC, supplyC, returnC, exhaustC, sDur, rDur, cfg }) {
-    // Node centres
-    const NO  = [45,  38];   // outside
-    const NSP = [255, 38];   // supply
-    const NEX = [45,  172];  // exhaust
-    const NRE = [255, 172];  // return
+    // Node centres (label + temperature text anchors)
+    const NO  = [50,  35];   // outside  — top-left
+    const NRE = [250, 35];   // return   — top-right
+    const NEX = [50,  165];  // exhaust  — bottom-left
+    const NSP = [250, 165];  // supply   — bottom-right
 
     // Unit box
-    const UX = 110, UY = 72, UW = 80, UH = 56;
+    const UX = 110, UY = 70, UW = 80, UH = 60;
+    // Ribbon entry/exit points at unit corners
+    const TL = [UX,       UY + 10];
+    const TR = [UX + UW,  UY + 10];
+    const BL = [UX,       UY + UH - 10];
+    const BR = [UX + UW,  UY + UH - 10];
 
-    // Points where legs touch the unit corners (inset by 6px)
-    const TL = [UX,       UY + 6];
-    const TR = [UX + UW,  UY + 6];
-    const BL = [UX,       UY + UH - 6];
-    const BR = [UX + UW,  UY + UH - 6];
+    // Ribbon endpoints just outside the text areas
+    const S0 = [73,  50];   // supply  ribbon start (near outside)
+    const S1 = [227, 150];  // supply  ribbon end   (near supply)
+    const R0 = [227, 50];   // exhaust ribbon start (near return)
+    const R1 = [73,  150];  // exhaust ribbon end   (near exhaust)
 
-    // Leg start/end (offset from node centre so text can sit next to it)
-    const OSout = [NO[0] + 20, NO[1] + 8];  // outside → TL
-    const SPout = [NSP[0] - 20, NSP[1] + 8]; // TR → supply
-    const REout = [NRE[0] - 20, NRE[1] - 8]; // return → BR
-    const EXout = [NEX[0] + 20, NEX[1] - 8]; // BL → exhaust
-
-    // Fan icon centres (⅔ along the leg, closer to the unit)
-    const fSX = Math.round((OSout[0] + 2 * TL[0]) / 3);
-    const fSY = Math.round((OSout[1] + 2 * TL[1]) / 3);
-    const fRX = Math.round((REout[0] + 2 * BR[0]) / 3);
-    const fRY = Math.round((REout[1] + 2 * BR[1]) / 3);
+    // Fan icon centres — midpoint of each ribbon's outer leg
+    const fSX = Math.round((S0[0] + TL[0]) / 2);
+    const fSY = Math.round((S0[1] + TL[1]) / 2);
+    const fRX = Math.round((R0[0] + TR[0]) / 2);
+    const fRY = Math.round((R0[1] + TR[1]) / 2);
 
     const fan = (x, y, color, dur, entityId) => {
       const blades = [0, 120, 240].map(a =>
@@ -346,67 +344,73 @@ class ComfoAirCard extends HTMLElement {
              repeatCount="indefinite" additive="sum"/>`
         : "";
       return `<g transform="translate(${x} ${y})" class="ca-node" data-e="${entityId}">
+        <circle r="11" fill="var(--card-background-color)" opacity="0.82"/>
         ${blades}
-        <circle cx="0" cy="0" r="2" fill="${color}"/>
+        <circle r="2.5" fill="${color}"/>
         ${anim}
       </g>`;
     };
 
-    return `<svg class="ca-svg" viewBox="0 0 300 210" xmlns="http://www.w3.org/2000/svg"
+    return `<svg class="ca-svg" viewBox="0 0 300 200" xmlns="http://www.w3.org/2000/svg"
       role="img" aria-label="ComfoAir airflow diagram">
+<defs>
+  <linearGradient id="ca-sg" gradientUnits="userSpaceOnUse"
+    x1="${S0[0]}" y1="${S0[1]}" x2="${S1[0]}" y2="${S1[1]}">
+    <stop offset="0%"   stop-color="${outsideC}"/>
+    <stop offset="100%" stop-color="${supplyC}"/>
+  </linearGradient>
+  <linearGradient id="ca-rg" gradientUnits="userSpaceOnUse"
+    x1="${R0[0]}" y1="${R0[1]}" x2="${R1[0]}" y2="${R1[1]}">
+    <stop offset="0%"   stop-color="${returnC}"/>
+    <stop offset="100%" stop-color="${exhaustC}"/>
+  </linearGradient>
+</defs>
 
-  <!-- ── outside → unit (supply path, fresh air) ── -->
-  <line x1="${OSout[0]}" y1="${OSout[1]}" x2="${TL[0]}" y2="${TL[1]}"
-    stroke="${outsideC}" stroke-width="3" stroke-linecap="round"/>
-  <!-- ── unit → supply (supply path, heated air) ── -->
-  <line x1="${TR[0]}" y1="${TR[1]}" x2="${SPout[0]}" y2="${SPout[1]}"
-    stroke="${supplyC}" stroke-width="3" stroke-linecap="round"/>
-  <!-- ── return → unit (stale-air path) ── -->
-  <line x1="${REout[0]}" y1="${REout[1]}" x2="${BR[0]}" y2="${BR[1]}"
-    stroke="${returnC}" stroke-width="3" stroke-linecap="round"/>
-  <!-- ── unit → exhaust (cooled stale air) ── -->
-  <line x1="${BL[0]}" y1="${BL[1]}" x2="${EXout[0]}" y2="${EXout[1]}"
-    stroke="${exhaustC}" stroke-width="3" stroke-linecap="round"/>
+<!-- supply ribbon: outside → unit TL/BR → supply house -->
+<polyline
+  points="${S0[0]},${S0[1]} ${TL[0]},${TL[1]} ${BR[0]},${BR[1]} ${S1[0]},${S1[1]}"
+  fill="none" stroke="url(#ca-sg)" stroke-width="16"
+  stroke-linejoin="round" stroke-linecap="round"/>
 
-  <!-- unit box -->
-  <rect x="${UX}" y="${UY}" width="${UW}" height="${UH}" rx="6"
-    fill="var(--card-background-color)" stroke="var(--divider-color)" stroke-width="2"/>
+<!-- exhaust ribbon: return house → unit TR/BL → exhaust outside -->
+<polyline
+  points="${R0[0]},${R0[1]} ${TR[0]},${TR[1]} ${BL[0]},${BL[1]} ${R1[0]},${R1[1]}"
+  fill="none" stroke="url(#ca-rg)" stroke-width="16"
+  stroke-linejoin="round" stroke-linecap="round"/>
 
-  <!-- counter-flow crossing (heat exchanger symbol) -->
-  <line x1="${TL[0]}" y1="${TL[1]}" x2="${BR[0]}" y2="${BR[1]}"
-    stroke="${outsideC}" stroke-width="2" opacity="0.45"/>
-  <line x1="${TR[0]}" y1="${TR[1]}" x2="${BL[0]}" y2="${BL[1]}"
-    stroke="${returnC}" stroke-width="2" opacity="0.45"/>
+<!-- unit box outline on top so it frames the crossing -->
+<rect x="${UX}" y="${UY}" width="${UW}" height="${UH}" rx="6"
+  fill="none" stroke="var(--divider-color)" stroke-width="2"/>
 
-  <!-- fan icons -->
-  ${fan(fSX, fSY, outsideC, sDur, cfg.supply_fan)}
-  ${fan(fRX, fRY, returnC,  rDur, cfg.return_fan)}
+<!-- fan icons -->
+${fan(fSX, fSY, outsideC, sDur, cfg.supply_fan)}
+${fan(fRX, fRY, returnC,  rDur, cfg.return_fan)}
 
-  <!-- temperature nodes (clickable) -->
-  <g class="ca-node" data-e="${cfg.outside_temp}">
-    <text x="${NO[0]}" y="${NO[1] - 10}" text-anchor="middle"
-      fill="var(--secondary-text-color)" font-size="9">Outside</text>
-    <text x="${NO[0]}" y="${NO[1] + 5}" text-anchor="middle"
-      fill="${outsideC}" font-size="14" font-weight="600">${this._esc(this._num(cfg.outside_temp))}</text>
-  </g>
-  <g class="ca-node" data-e="${cfg.supply_temp}">
-    <text x="${NSP[0]}" y="${NSP[1] - 10}" text-anchor="middle"
-      fill="var(--secondary-text-color)" font-size="9">Supply</text>
-    <text x="${NSP[0]}" y="${NSP[1] + 5}" text-anchor="middle"
-      fill="${supplyC}" font-size="14" font-weight="600">${this._esc(this._num(cfg.supply_temp))}</text>
-  </g>
-  <g class="ca-node" data-e="${cfg.exhaust_temp}">
-    <text x="${NEX[0]}" y="${NEX[1] - 4}" text-anchor="middle"
-      fill="${exhaustC}" font-size="14" font-weight="600">${this._esc(this._num(cfg.exhaust_temp))}</text>
-    <text x="${NEX[0]}" y="${NEX[1] + 11}" text-anchor="middle"
-      fill="var(--secondary-text-color)" font-size="9">Exhaust</text>
-  </g>
-  <g class="ca-node" data-e="${cfg.return_temp}">
-    <text x="${NRE[0]}" y="${NRE[1] - 4}" text-anchor="middle"
-      fill="${returnC}" font-size="14" font-weight="600">${this._esc(this._num(cfg.return_temp))}</text>
-    <text x="${NRE[0]}" y="${NRE[1] + 11}" text-anchor="middle"
-      fill="var(--secondary-text-color)" font-size="9">Return</text>
-  </g>
+<!-- temperature nodes (clickable) -->
+<g class="ca-node" data-e="${cfg.outside_temp}">
+  <text x="${NO[0]}" y="${NO[1] - 10}" text-anchor="middle"
+    fill="var(--secondary-text-color)" font-size="9">Outside</text>
+  <text x="${NO[0]}" y="${NO[1] + 5}" text-anchor="middle"
+    fill="${outsideC}" font-size="14" font-weight="600">${this._esc(this._num(cfg.outside_temp))}</text>
+</g>
+<g class="ca-node" data-e="${cfg.return_temp}">
+  <text x="${NRE[0]}" y="${NRE[1] - 10}" text-anchor="middle"
+    fill="var(--secondary-text-color)" font-size="9">Return</text>
+  <text x="${NRE[0]}" y="${NRE[1] + 5}" text-anchor="middle"
+    fill="${returnC}" font-size="14" font-weight="600">${this._esc(this._num(cfg.return_temp))}</text>
+</g>
+<g class="ca-node" data-e="${cfg.exhaust_temp}">
+  <text x="${NEX[0]}" y="${NEX[1] - 3}" text-anchor="middle"
+    fill="${exhaustC}" font-size="14" font-weight="600">${this._esc(this._num(cfg.exhaust_temp))}</text>
+  <text x="${NEX[0]}" y="${NEX[1] + 12}" text-anchor="middle"
+    fill="var(--secondary-text-color)" font-size="9">Exhaust</text>
+</g>
+<g class="ca-node" data-e="${cfg.supply_temp}">
+  <text x="${NSP[0]}" y="${NSP[1] - 3}" text-anchor="middle"
+    fill="${supplyC}" font-size="14" font-weight="600">${this._esc(this._num(cfg.supply_temp))}</text>
+  <text x="${NSP[0]}" y="${NSP[1] + 12}" text-anchor="middle"
+    fill="var(--secondary-text-color)" font-size="9">Supply</text>
+</g>
 </svg>`;
   }
 
