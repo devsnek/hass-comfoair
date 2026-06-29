@@ -14,6 +14,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     PERCENTAGE,
     REVOLUTIONS_PER_MINUTE,
+    EntityCategory,
     UnitOfElectricPotential,
     UnitOfTemperature,
     UnitOfTime,
@@ -56,11 +57,13 @@ _HOURS: Any = dict(
     native_unit_of_measurement=UnitOfTime.HOURS,
     device_class=SensorDeviceClass.DURATION,
     state_class=SensorStateClass.TOTAL_INCREASING,
+    entity_category=EntityCategory.DIAGNOSTIC,
 )
 _MINUTES: Any = dict(
     native_unit_of_measurement=UnitOfTime.MINUTES,
     device_class=SensorDeviceClass.DURATION,
     state_class=SensorStateClass.MEASUREMENT,
+    entity_category=EntityCategory.DIAGNOSTIC,
 )
 
 SENSORS: tuple[ComfoAirSensorEntityDescription, ...] = (
@@ -89,16 +92,38 @@ SENSORS: tuple[ComfoAirSensorEntityDescription, ...] = (
     ComfoAirSensorEntityDescription(key="frost_protection_hours", **_HOURS),
     ComfoAirSensorEntityDescription(key="filter_hours", **_HOURS),
     # text / enum-like
-    ComfoAirSensorEntityDescription(key="filter_status"),
-    ComfoAirSensorEntityDescription(key="current_errors"),
-    ComfoAirSensorEntityDescription(key="last_errors"),
-    ComfoAirSensorEntityDescription(key="second_last_errors"),
-    ComfoAirSensorEntityDescription(key="third_last_errors"),
+    ComfoAirSensorEntityDescription(
+        key="filter_status", entity_category=EntityCategory.DIAGNOSTIC
+    ),
+    ComfoAirSensorEntityDescription(
+        key="current_errors", entity_category=EntityCategory.DIAGNOSTIC
+    ),
+    ComfoAirSensorEntityDescription(
+        key="last_errors", entity_category=EntityCategory.DIAGNOSTIC
+    ),
+    ComfoAirSensorEntityDescription(
+        key="second_last_errors", entity_category=EntityCategory.DIAGNOSTIC
+    ),
+    ComfoAirSensorEntityDescription(
+        key="third_last_errors", entity_category=EntityCategory.DIAGNOSTIC
+    ),
     # bypass (optional)
     ComfoAirSensorEntityDescription(key="bypass_valve", **_PCT, feature=FEATURE_BYPASS),
-    ComfoAirSensorEntityDescription(key="bypass_factor", feature=FEATURE_BYPASS),
-    ComfoAirSensorEntityDescription(key="bypass_step", feature=FEATURE_BYPASS),
-    ComfoAirSensorEntityDescription(key="bypass_correction", feature=FEATURE_BYPASS),
+    ComfoAirSensorEntityDescription(
+        key="bypass_factor",
+        feature=FEATURE_BYPASS,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    ComfoAirSensorEntityDescription(
+        key="bypass_step",
+        feature=FEATURE_BYPASS,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    ComfoAirSensorEntityDescription(
+        key="bypass_correction",
+        feature=FEATURE_BYPASS,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
     ComfoAirSensorEntityDescription(
         key="bypass_open_hours",
         **_HOURS,
@@ -109,12 +134,14 @@ SENSORS: tuple[ComfoAirSensorEntityDescription, ...] = (
         key="motor_current_bypass",
         state_class=SensorStateClass.MEASUREMENT,
         feature=FEATURE_BYPASS,
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     # preheating (optional)
     ComfoAirSensorEntityDescription(
         key="motor_current_preheating",
         state_class=SensorStateClass.MEASUREMENT,
         feature=FEATURE_PREHEATING,
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     ComfoAirSensorEntityDescription(
         key="preheating_hours",
@@ -126,10 +153,15 @@ SENSORS: tuple[ComfoAirSensorEntityDescription, ...] = (
         **_MINUTES,
         feature=FEATURE_PREHEATING,
     ),
-    ComfoAirSensorEntityDescription(key="preheating_valve", feature=FEATURE_PREHEATING),
+    ComfoAirSensorEntityDescription(
+        key="preheating_valve",
+        feature=FEATURE_PREHEATING,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
     ComfoAirSensorEntityDescription(
         key="frost_protection_level",
         feature=FEATURE_PREHEATING,
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     # enthalpy / EWT / post-heating / kitchen hood (optional temps)
     ComfoAirSensorEntityDescription(
@@ -157,6 +189,7 @@ SENSORS: tuple[ComfoAirSensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfElectricPotential.VOLT,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=2,
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     ComfoAirSensorEntityDescription(
         key="analog_input_2",
@@ -164,6 +197,7 @@ SENSORS: tuple[ComfoAirSensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfElectricPotential.VOLT,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=2,
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     ComfoAirSensorEntityDescription(
         key="analog_input_3",
@@ -171,6 +205,7 @@ SENSORS: tuple[ComfoAirSensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfElectricPotential.VOLT,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=2,
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     ComfoAirSensorEntityDescription(
         key="analog_input_4",
@@ -178,17 +213,20 @@ SENSORS: tuple[ComfoAirSensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfElectricPotential.VOLT,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=2,
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     # post-heating diagnostics (read-only; the controller drives them)
     ComfoAirSensorEntityDescription(
         key="postheating_power",
         state_class=SensorStateClass.MEASUREMENT,
         feature=FEATURE_POSTHEATING,
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     ComfoAirSensorEntityDescription(
         key="postheating_power_i",
         state_class=SensorStateClass.MEASUREMENT,
         feature=FEATURE_POSTHEATING,
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
 )
 

@@ -9,6 +9,7 @@ from homeassistant.components.binary_sensor import (
     BinarySensorEntityDescription,
 )
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -41,15 +42,28 @@ SENSORS: tuple[ComfoAirBinarySensorEntityDescription, ...] = (
         feature=FEATURE_PREHEATING,
     ),
     # physical switch inputs (0x03 Eingänge)
-    ComfoAirBinarySensorEntityDescription(key="step_switch_l1"),
-    ComfoAirBinarySensorEntityDescription(key="step_switch_l2"),
-    ComfoAirBinarySensorEntityDescription(key="bathroom_switch"),
-    ComfoAirBinarySensorEntityDescription(key="bathroom_switch_2"),
-    ComfoAirBinarySensorEntityDescription(key="external_filter_switch"),
-    ComfoAirBinarySensorEntityDescription(key="heat_recovery_switch"),
+    ComfoAirBinarySensorEntityDescription(
+        key="step_switch_l1", entity_category=EntityCategory.DIAGNOSTIC
+    ),
+    ComfoAirBinarySensorEntityDescription(
+        key="step_switch_l2", entity_category=EntityCategory.DIAGNOSTIC
+    ),
+    ComfoAirBinarySensorEntityDescription(
+        key="bathroom_switch", entity_category=EntityCategory.DIAGNOSTIC
+    ),
+    ComfoAirBinarySensorEntityDescription(
+        key="bathroom_switch_2", entity_category=EntityCategory.DIAGNOSTIC
+    ),
+    ComfoAirBinarySensorEntityDescription(
+        key="external_filter_switch", entity_category=EntityCategory.DIAGNOSTIC
+    ),
+    ComfoAirBinarySensorEntityDescription(
+        key="heat_recovery_switch", entity_category=EntityCategory.DIAGNOSTIC
+    ),
     ComfoAirBinarySensorEntityDescription(
         key="kitchen_hood_switch",
         feature=FEATURE_KITCHEN_HOOD,
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
 )
 
