@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from typing import Callable
 from serialx import Parity, StopBits, open_serial_connection
 from homeassistant.core import HomeAssistant
@@ -36,6 +37,9 @@ class ComfoAirTransport:
 
         self._waiters: dict[int, list[asyncio.Future[Frame]]] = {}
         self._callbacks: list[Callable[[Frame], None]] = []
+        self._disconnect_callbacks: list[Callable[[], None]] = []
+        # monotonic timestamp of the last byte received; 0.0 until first read
+        self._last_rx: float = 0.0
 
     @property
     def is_connected(self) -> bool:
@@ -45,6 +49,29 @@ class ComfoAirTransport:
             and self._reader_task is not None
             and not self._reader_task.done()
         )
+
+    @property
+    def seconds_since_rx(self) -> float:
+        """Seconds since the last byte arrived.
+
+        The esphome serial proxy never surfaces a dropped link as EOF, so a dead
+        connection leaves the reader blocked forever rather than raising. A
+        growing value here is the only signal that the link has gone silent.
+        """
+        if self._last_rx == 0.0:
+            return float("inf")
+        return time.monotonic() - self._last_rx
+
+    def add_disconnect_callback(self, callback: Callable[[], None]) -> None:
+        """Register a callback fired when the reader exits unexpectedly."""
+        self._disconnect_callbacks.append(callback)
+
+    def _notify_disconnect(self) -> None:
+        for callback in self._disconnect_callbacks:
+            try:
+                callback()
+            except Exception:  # noqa: BLE001
+                _LOGGER.exception("error in disconnect callback")
 
     async def disconnect(self) -> None:
         self._is_closing = True
@@ -77,6 +104,7 @@ class ComfoAirTransport:
             parity=Parity.NONE,
             stopbits=StopBits.ONE,
         )
+        self._last_rx = time.monotonic()
         self._reader_task = self.hass.async_create_background_task(
             self._reader(reader), "ComfoAir Serial Reader"
         )
@@ -89,6 +117,7 @@ class ComfoAirTransport:
                 chunk = await reader.read(64)
                 if not chunk:
                     raise ConnectionError("serial EOF")
+                self._last_rx = time.monotonic()
                 for frame in parser.feed(chunk):
                     self._dispatch(frame)
         except asyncio.CancelledError:
@@ -97,6 +126,7 @@ class ComfoAirTransport:
             if not self._is_closing:
                 _LOGGER.warning("ComfoAir reader stopped: %s", err)
                 self._fail_waiters(err)
+                self._notify_disconnect()
 
     def _dispatch(self, frame: Frame) -> None:
         if frame.is_ack:

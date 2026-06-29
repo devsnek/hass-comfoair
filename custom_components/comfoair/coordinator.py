@@ -41,6 +41,8 @@ _LOGGER = logging.getLogger(__name__)
 
 POLL_INTERVAL = timedelta(seconds=5)
 PROBE_TIMEOUT = 3.0
+POLL_REQUEST_TIMEOUT = 0.5
+STALE_RELOAD_SECONDS = 30.0
 
 
 class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
@@ -84,7 +86,9 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             FEATURE_EWT: False,
         }
         self._state: dict[str, Any] = {}
+        self._reloading = False
         self.transport.add_callback(self.on_frame)
+        self.transport.add_disconnect_callback(self._handle_disconnect)
 
     # ---- frame dispatch ------------------------------------------------------
 
@@ -104,6 +108,20 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Push the updated snapshot to entities. Safe to call from the reader
         # task because we're on the event loop.
         self.async_set_updated_data(dict(self._state))
+
+    # ---- reconnection --------------------------------------------------------
+
+    def _handle_disconnect(self) -> None:
+        """Transport reader exited (EOF/error). Reload to reconnect cleanly."""
+        self._schedule_reload("transport disconnected")
+
+    def _schedule_reload(self, reason: str) -> None:
+        """Reload the config entry, rebuilding the transport from scratch."""
+        if self._reloading:
+            return
+        self._reloading = True
+        _LOGGER.warning("ComfoAir link lost (%s); reloading entry", reason)
+        self.hass.config_entries.async_schedule_reload(self.entry.entry_id)
 
     # ---- setup / discovery ---------------------------------------------------
 
@@ -138,29 +156,29 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             p.CMD_GET_STATUS, p.RES_GET_STATUS, timeout=PROBE_TIMEOUT
         )
 
-    def _poll_commands(self) -> list[int]:
+    def _poll_commands(self) -> list[tuple[int, int]]:
+        """The reads to issue each cycle, as (command, expected response) pairs."""
         cmds = [
-            p.CMD_GET_FAN_STATUS,
-            p.CMD_GET_VENTILATION_LEVEL,
-            p.CMD_GET_TEMPERATURES,
-            p.CMD_GET_FAULTS,
-            p.CMD_GET_OPERATION_HOURS,
-            p.CMD_GET_TIME_DELAY,
-            p.CMD_GET_VALVE_STATUS,
-            p.CMD_GET_INPUTS,
-            p.CMD_GET_ANALOG_INPUTS,
-            # Always poll bypass/preheating rather than gating on feature
-            # detection: the status frame's feature bits are unreliable on some
-            # firmware, and a unit that doesn't have the module simply ignores
-            # the read. This keeps summer_mode/bypass flowing even when
-            # detection missed them. Entity creation stays feature-gated.
-            p.CMD_GET_BYPASS_CONTROL_STATUS,
-            p.CMD_GET_PREHEATING_STATUS,
+            (p.CMD_GET_FAN_STATUS, p.RES_GET_FAN_STATUS),
+            (p.CMD_GET_VENTILATION_LEVEL, p.RES_GET_VENTILATION_LEVEL),
+            (p.CMD_GET_TEMPERATURES, p.RES_GET_TEMPERATURES),
+            (p.CMD_GET_FAULTS, p.RES_GET_FAULTS),
+            (p.CMD_GET_OPERATION_HOURS, p.RES_GET_OPERATION_HOURS),
+            (p.CMD_GET_TIME_DELAY, p.RES_GET_TIME_DELAY),
+            (p.CMD_GET_VALVE_STATUS, p.RES_GET_VALVE_STATUS),
+            (p.CMD_GET_INPUTS, p.RES_GET_INPUTS),
+            (p.CMD_GET_ANALOG_INPUTS, p.RES_GET_ANALOG_INPUTS),
         ]
+        if self.features[FEATURE_BYPASS]:
+            cmds.append(
+                (p.CMD_GET_BYPASS_CONTROL_STATUS, p.RES_GET_BYPASS_CONTROL_STATUS)
+            )
+        if self.features[FEATURE_PREHEATING]:
+            cmds.append((p.CMD_GET_PREHEATING_STATUS, p.RES_GET_PREHEATING_STATUS))
         if self.features[FEATURE_ENTHALPY]:
-            cmds.append(p.CMD_GET_SENSOR_DATA)
+            cmds.append((p.CMD_GET_SENSOR_DATA, p.RES_GET_SENSOR_DATA))
         if self.features[FEATURE_EWT] or self.features[FEATURE_POSTHEATING]:
-            cmds.append(p.CMD_GET_EWT_POSTHEATING)
+            cmds.append((p.CMD_GET_EWT_POSTHEATING, p.RES_GET_EWT_POSTHEATING))
         return cmds
 
     # ---- polling -------------------------------------------------------------
@@ -169,12 +187,25 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         try:
             if not self.transport.is_connected:
                 await self.transport.connect()
-            for cmd in self._poll_commands():
-                await self.transport.send(cmd)
+            for cmd, expected in self._poll_commands():
+                try:
+                    # comfoair will drop commands if its still busy replying to previous
+                    await self.transport.request(
+                        cmd, expected, timeout=POLL_REQUEST_TIMEOUT
+                    )
+                except asyncio.TimeoutError:
+                    _LOGGER.debug(
+                        "poll: no response to 0x%02X (expected 0x%02X)", cmd, expected
+                    )
             # key status with nothing pressed just to get display status
             await self.async_key_status()
-        except (ConnectionError, asyncio.TimeoutError) as err:
+        except ConnectionError as err:
             raise UpdateFailed(str(err)) from err
+        # esphome serialx transport doesn't raise on connection loss (just hangs)
+        # so if we hear nothing from the device for some time, reload everything.
+        if self.transport.seconds_since_rx > STALE_RELOAD_SECONDS:
+            self._schedule_reload(f"no data for {self.transport.seconds_since_rx:.0f}s")
+            raise UpdateFailed("connection stale; reloading")
         return dict(self._state)
 
     # ---- parsers (data slices map directly to msg bytes in registers.h) ------

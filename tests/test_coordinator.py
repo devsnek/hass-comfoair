@@ -7,9 +7,11 @@ HA-dependent ``__init__``) rather than standing up a full hass fixture.
 
 from __future__ import annotations
 
-from typing import cast
+from types import SimpleNamespace
+from typing import cast, Any
 
 import pytest
+from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from custom_components.comfoair import protocol as p
 from custom_components.comfoair.const import (
@@ -52,6 +54,40 @@ class FakeTransport:
 
     async def send(self, cmd: int, data: bytes = b"") -> None:
         self.sent.append((cmd, data))
+
+
+class FakePollTransport:
+    """A connected transport whose reads succeed; rx-staleness is settable."""
+
+    def __init__(self, seconds_since_rx: float = 0.0) -> None:
+        self.is_connected = True
+        self.seconds_since_rx = seconds_since_rx
+        self.sent: list[tuple[int, bytes]] = []
+
+    async def request(self, cmd: int, expected: int, timeout: float = 0.0):
+        return None
+
+    async def send(self, cmd: int, data: bytes = b"") -> None:
+        self.sent.append((cmd, data))
+
+
+class FakeConfigEntries:
+    def __init__(self) -> None:
+        self.reloaded: list[str] = []
+
+    def async_schedule_reload(self, entry_id: str) -> None:
+        self.reloaded.append(entry_id)
+
+
+def make_reload_coordinator(seconds_since_rx: float = 0.0):
+    """Coordinator wired with just enough to exercise the reload paths."""
+    coord = make_coordinator()
+    coord._reloading = False
+    coord.transport = cast(ComfoAirTransport, FakePollTransport(seconds_since_rx))
+    entries = FakeConfigEntries()
+    coord.hass = cast("Any", SimpleNamespace(config_entries=entries))
+    coord.entry = cast("Any", SimpleNamespace(entry_id="entry-1"))
+    return coord, entries
 
 
 # --- _get_byte ----------------------------------------------------------------
@@ -356,3 +392,33 @@ async def test_async_set_fan_percentages_clamps_and_requires_known_values() -> N
     cmd, data = fake.sent[0]
     assert cmd == p.CMD_SET_VENTILATION_LEVEL
     assert data == bytes([15, 30, 40, 50, 60, 70, 95, 80, 0x00])
+
+
+# --- reconnection on dropped link ---------------------------------------------
+
+
+def test_handle_disconnect_schedules_reload() -> None:
+    coord, entries = make_reload_coordinator()
+    coord._handle_disconnect()
+    assert entries.reloaded == ["entry-1"]
+
+
+def test_schedule_reload_is_guarded_against_double_fire() -> None:
+    coord, entries = make_reload_coordinator()
+    coord._handle_disconnect()  # e.g. transport disconnect callback
+    coord._schedule_reload("watchdog")  # e.g. staleness watchdog right after
+    assert entries.reloaded == ["entry-1"]  # only one reload scheduled
+
+
+async def test_update_data_reloads_when_link_goes_stale() -> None:
+    coord, entries = make_reload_coordinator(seconds_since_rx=999.0)
+    with pytest.raises(UpdateFailed):
+        await coord._async_update_data()
+    assert entries.reloaded == ["entry-1"]
+
+
+async def test_update_data_does_not_reload_while_fresh() -> None:
+    coord, entries = make_reload_coordinator(seconds_since_rx=0.0)
+    result = await coord._async_update_data()
+    assert entries.reloaded == []
+    assert result == {}  # no parsers ran; just proves the happy path returns state
