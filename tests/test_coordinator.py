@@ -220,6 +220,66 @@ def test_parse_status_tolerates_short_frame() -> None:
     assert coord.features[FEATURE_PREHEATING] is True
     assert coord.features[FEATURE_EWT] is False
 
+def test_parse_status_preserves_enthalpy_mode_without_sensor() -> None:
+    coord = make_coordinator()
+    data = bytearray(11)
+    data[9] = 2  # enthalpy exchanger present, without sensor
+
+    coord._parse_status(bytes(data))
+
+    assert coord.features[FEATURE_ENTHALPY] is True
+    assert coord._state["enthalpy_mode"] == 2
+
+
+# --- _parse_sensor_data (enthalpy 0x98) ---------------------------------------
+
+
+def test_parse_sensor_data_with_enthalpy_sensor() -> None:
+    coord = make_coordinator()
+    coord._state["enthalpy_mode"] = 1
+
+    data = bytearray(17)
+    data[0] = p.temp_to_byte(23.5)
+    data[1] = 47
+    data[4] = 65
+    data[5] = 10
+
+    coord._parse_sensor_data(bytes(data))
+
+    s = coord._state
+    assert s["enthalpy_temperature"] == 23.5
+    assert s["enthalpy_humidity"] == 47
+    assert s["enthalpy_coefficient"] == 65
+    assert s["enthalpy_timer"] == 120
+
+
+def test_parse_sensor_data_without_enthalpy_sensor() -> None:
+    coord = make_coordinator()
+    coord._state["enthalpy_mode"] = 2
+
+    data = bytearray(17)
+    data[0] = 0
+    data[1] = 0
+    data[4] = 55
+    data[5] = 5
+
+    coord._parse_sensor_data(bytes(data))
+
+    s = coord._state
+    assert s["enthalpy_temperature"] is None
+    assert s["enthalpy_humidity"] is None
+    assert s["enthalpy_coefficient"] == 55
+    assert s["enthalpy_timer"] == 60
+
+
+def test_parse_sensor_data_tolerates_short_frame() -> None:
+    coord = make_coordinator()
+    coord._state["enthalpy_mode"] = 1
+
+    coord._parse_sensor_data(bytes(5))
+
+    assert coord._state == {"enthalpy_mode": 1}
+
 
 # --- _parse_cc_ease_display (0x3C) --------------------------------------------
 
