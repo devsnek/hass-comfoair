@@ -388,6 +388,7 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             s["enthalpy_humidity"] = None
 
         s["enthalpy_coefficient"] = d[4]
+        # Protocol timer values are 12-minute increments.
         s["enthalpy_timer"] = d[5] * 12
 
     def _parse_inputs(self, d: bytes) -> None:
