@@ -169,7 +169,6 @@ SENSORS: tuple[ComfoAirSensorEntityDescription, ...] = (
         feature=FEATURE_ENTHALPY,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
-    
     ComfoAirSensorEntityDescription(
         key="enthalpy_temperature",
         **_TEMP,
