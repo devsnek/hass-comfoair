@@ -220,6 +220,7 @@ def test_parse_status_tolerates_short_frame() -> None:
     assert coord.features[FEATURE_PREHEATING] is True
     assert coord.features[FEATURE_EWT] is False
 
+
 def test_parse_status_preserves_enthalpy_mode_without_sensor() -> None:
     coord = make_coordinator()
     data = bytearray(11)
