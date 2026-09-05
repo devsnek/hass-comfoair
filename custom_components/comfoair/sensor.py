@@ -193,8 +193,7 @@ SENSORS: tuple[ComfoAirSensorEntityDescription, ...] = (
         **_MINUTES,
         feature=FEATURE_ENTHALPY,
     ),
-
-# EWT / post-heating / kitchen hood (optional temps)
+    # EWT / post-heating / kitchen hood (optional temps)
     ComfoAirSensorEntityDescription(
         key="ewt_temperature", **_TEMP, feature=FEATURE_EWT
     ),
