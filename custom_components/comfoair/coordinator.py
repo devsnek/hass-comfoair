@@ -379,7 +379,7 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return
         s = self._state
         mode = s.get("enthalpy_mode")
-    
+        
         if mode == 1:
             s["enthalpy_temperature"] = p.byte_to_temp(d[0])
             s["enthalpy_humidity"] = d[1]
