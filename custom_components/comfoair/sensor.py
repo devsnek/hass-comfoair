@@ -163,12 +163,38 @@ SENSORS: tuple[ComfoAirSensorEntityDescription, ...] = (
         feature=FEATURE_PREHEATING,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
-    # enthalpy / EWT / post-heating / kitchen hood (optional temps)
+    # enthalpy
+    ComfoAirSensorEntityDescription(
+        key="enthalpy_mode",
+        feature=FEATURE_ENTHALPY,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    
     ComfoAirSensorEntityDescription(
         key="enthalpy_temperature",
         **_TEMP,
         feature=FEATURE_ENTHALPY,
     ),
+    ComfoAirSensorEntityDescription(
+        key="enthalpy_humidity",
+        device_class=SensorDeviceClass.HUMIDITY,
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        feature=FEATURE_ENTHALPY,
+    ),
+    ComfoAirSensorEntityDescription(
+        key="enthalpy_coefficient",
+        **_PCT,
+        feature=FEATURE_ENTHALPY,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    ComfoAirSensorEntityDescription(
+        key="enthalpy_timer",
+        **_MINUTES,
+        feature=FEATURE_ENTHALPY,
+    ),
+
+# EWT / post-heating / kitchen hood (optional temps)
     ComfoAirSensorEntityDescription(
         key="ewt_temperature", **_TEMP, feature=FEATURE_EWT
     ),
