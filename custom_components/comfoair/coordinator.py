@@ -234,7 +234,7 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # preheating and leave those entities stuck "unknown".
         b4 = _get_byte(d, 4)
         enthalpy_mode = _get_byte(d, 9)
-        
+
         if enthalpy_mode is not None:
             self._state["enthalpy_mode"] = enthalpy_mode
 
@@ -379,7 +379,7 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return
         s = self._state
         mode = s.get("enthalpy_mode")
-        
+
         if mode == 1:
             s["enthalpy_temperature"] = p.byte_to_temp(d[0])
             s["enthalpy_humidity"] = d[1]
