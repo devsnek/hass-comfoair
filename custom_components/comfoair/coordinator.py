@@ -388,7 +388,7 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             s["enthalpy_humidity"] = None
 
         s["enthalpy_coefficient"] = d[4]
-        s["enthalpy_timer"] = d[5]
+        s["enthalpy_timer"] = d[5] * 12
 
     def _parse_inputs(self, d: bytes) -> None:
         s = self._state
