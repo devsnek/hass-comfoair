@@ -233,6 +233,11 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # a short/partial frame can't silently stop us polling bypass or
         # preheating and leave those entities stuck "unknown".
         b4 = _get_byte(d, 4)
+        enthalpy_mode = _get_byte(d, 9)
+
+        if enthalpy_mode is not None:
+            self._state["enthalpy_mode"] = enthalpy_mode
+
         f = self.features
         self.features = {
             FEATURE_PREHEATING: f[FEATURE_PREHEATING] or bool(_get_byte(d, 0)),
@@ -240,7 +245,7 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             FEATURE_FIREPLACE: f[FEATURE_FIREPLACE] or bool(b4 and b4 & 0x01),
             FEATURE_KITCHEN_HOOD: f[FEATURE_KITCHEN_HOOD] or bool(b4 and b4 & 0x02),
             FEATURE_POSTHEATING: f[FEATURE_POSTHEATING] or bool(b4 and b4 & 0x04),
-            FEATURE_ENTHALPY: f[FEATURE_ENTHALPY] or bool(_get_byte(d, 9)),
+            FEATURE_ENTHALPY: f[FEATURE_ENTHALPY] or bool(enthalpy_mode),
             FEATURE_EWT: f[FEATURE_EWT] or bool(_get_byte(d, 10)),
         }
 
@@ -370,7 +375,21 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         }.get(d[5], "Unknown")
 
     def _parse_sensor_data(self, d: bytes) -> None:
-        self._state["enthalpy_temperature"] = p.byte_to_temp(d[0])
+        if len(d) < 6:
+            return
+        s = self._state
+        mode = s.get("enthalpy_mode")
+
+        if mode == 1:
+            s["enthalpy_temperature"] = p.byte_to_temp(d[0])
+            s["enthalpy_humidity"] = d[1]
+        else:
+            s["enthalpy_temperature"] = None
+            s["enthalpy_humidity"] = None
+
+        s["enthalpy_coefficient"] = d[4]
+        # Protocol timer values are 12-minute increments.
+        s["enthalpy_timer"] = d[5] * 12
 
     def _parse_inputs(self, d: bytes) -> None:
         s = self._state
