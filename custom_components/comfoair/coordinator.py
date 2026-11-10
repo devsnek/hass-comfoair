@@ -33,6 +33,7 @@ from .const import (
     FAN_BALANCE_BALANCED,
     FAN_BALANCE_SUPPLY_ONLY,
     FAN_BALANCE_EXHAUST_ONLY,
+    RS232_MODES,
 )
 from .protocol import Frame
 from .transport import ComfoAirTransport
@@ -418,6 +419,12 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         s["postheating_power_i"] = d[5]
         s["postheating_target_temperature"] = p.byte_to_temp(d[6])
 
+    def _parse_rs232_mode(self, d: bytes) -> None:
+        raw = _get_byte(d, 0)
+        self._state["rs232_mode"] = next(
+            (name for name, value in RS232_MODES.items() if value == raw), None
+        )
+
     def _parse_cc_ease_display(self, d: bytes) -> None:
         """Decode a CC-Ease LCD frame (0x3C)."""
         if len(d) < 10:
@@ -464,6 +471,10 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             raise ValueError(f"invalid ventilation level: {level}")
         await self.transport.send(p.CMD_SET_LEVEL, bytes([level]))
         await self.transport.send(p.CMD_GET_VENTILATION_LEVEL)
+
+    async def async_set_rs232_mode(self, mode: str) -> None:
+        """Switch the PC port mode; the unit echoes the new mode in 0x9C."""
+        await self.transport.send(p.CMD_SET_RS232_MODE, bytes([RS232_MODES[mode]]))
 
     async def async_set_comfort_temperature(self, temperature: float) -> None:
         if not MIN_TEMPERATURE <= temperature <= MAX_TEMPERATURE:
@@ -661,5 +672,6 @@ _PARSERS: dict[int, Callable[[ComfoAirCoordinator, bytes], None]] = {
     p.RES_GET_EWT_POSTHEATING: ComfoAirCoordinator._parse_ewt_postheating,
     p.RES_GET_INPUTS: ComfoAirCoordinator._parse_inputs,
     p.RES_GET_ANALOG_INPUTS: ComfoAirCoordinator._parse_analog_inputs,
+    p.RES_SET_RS232_MODE: ComfoAirCoordinator._parse_rs232_mode,
     p.CMD_CC_EASE_SET_DISPLAY: ComfoAirCoordinator._parse_cc_ease_display,
 }

@@ -123,6 +123,16 @@
           "supply_only": "Supply only",
           "exhaust_only": "Exhaust only"
         }
+      },
+      "rs232_mode": {
+        "name": "RS232 Mode",
+        "state": {
+          "end": "End",
+          "pc_only": "PC only",
+          "cc_ease_only": "CC-Ease only",
+          "pc_master": "PC master",
+          "pc_log": "PC log"
+        }
       }
     }
   }

@@ -455,6 +455,24 @@ async def test_async_set_fan_percentages_clamps_and_requires_known_values() -> N
     assert data == bytes([15, 30, 40, 50, 60, 70, 95, 80, 0x00])
 
 
+async def test_async_set_rs232_mode_sends_mode_byte() -> None:
+    coord = make_coordinator()
+    fake = FakeTransport()
+    coord.transport = cast(ComfoAirTransport, fake)
+    await coord.async_set_rs232_mode("pc_master")
+    assert fake.sent == [(p.CMD_SET_RS232_MODE, bytes([0x03]))]
+
+
+@pytest.mark.parametrize(
+    ("data", "expected"),
+    [(b"\x00", "end"), (b"\x04", "pc_log"), (b"\x09", None), (b"", None)],
+)
+def test_parse_rs232_mode(data: bytes, expected: str | None) -> None:
+    coord = make_coordinator()
+    coord._parse_rs232_mode(data)
+    assert coord._state["rs232_mode"] == expected
+
+
 # --- reconnection on dropped link ---------------------------------------------
 
 
