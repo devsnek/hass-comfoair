@@ -6,6 +6,9 @@ DOMAIN = "comfoair"
 
 DEFAULT_NAME = "ComfoAir"
 
+# Config entry option holding the last RS232 mode the user picked
+CONF_RS232_MODE = "rs232_mode"
+
 MIN_TEMPERATURE = 12.0
 MAX_TEMPERATURE = 29.0
 

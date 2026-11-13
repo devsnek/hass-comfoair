@@ -8,7 +8,7 @@ dependencies = []
 
 [dependency-groups]
 dev = [
-    "homeassistant>=2026.6.1",
+    "homeassistant>=2026.11.0",
     "pytest>=9.0.3",
     "pytest-asyncio>=1.4.0",
     "serialx>=1.8.0",

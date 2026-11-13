@@ -40,10 +40,11 @@ class ComfoAirFanBalanceSelect(ComfoAirEntity, SelectEntity):
 
 
 class ComfoAirRS232ModeSelect(ComfoAirEntity, SelectEntity):
-    """Debug control for the PC port mode (0x9B).
+    """Control for the PC port mode (0x9B).
 
     There is no read command for this; the state is only known once the unit
-    has echoed a mode back in 0x9C after a set.
+    has echoed a mode back in 0x9C after a set. The unit forgets the mode on
+    power loss, so the coordinator stores it and reapplies it.
     """
 
     _attr_icon = "mdi:serial-port"

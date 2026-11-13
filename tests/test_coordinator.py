@@ -13,8 +13,10 @@ from typing import cast, Any
 import pytest
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
+from custom_components.comfoair import coordinator as coordinator_module
 from custom_components.comfoair import protocol as p
 from custom_components.comfoair.const import (
+    CONF_RS232_MODE,
     FEATURE_BYPASS,
     FEATURE_ENTHALPY,
     FEATURE_EWT,
@@ -24,16 +26,20 @@ from custom_components.comfoair.const import (
     FEATURE_PREHEATING,
 )
 from custom_components.comfoair.coordinator import (
+    RS232_REAPPLY_GAP_SECONDS,
     ComfoAirCoordinator,
     _format_errors,
     _get_byte,
 )
+from custom_components.comfoair.protocol import Frame
 from custom_components.comfoair.transport import ComfoAirTransport
 
 
 def make_coordinator() -> ComfoAirCoordinator:
     coord = object.__new__(ComfoAirCoordinator)
     coord._state = {}
+    coord._last_frame_at = None
+    coord._rs232_reapply_pending = False
     coord.features = {
         FEATURE_PREHEATING: False,
         FEATURE_BYPASS: False,
@@ -78,15 +84,22 @@ class FakeConfigEntries:
     def async_schedule_reload(self, entry_id: str) -> None:
         self.reloaded.append(entry_id)
 
+    def async_update_entry(self, entry: Any, *, options: dict[str, Any]) -> None:
+        entry.options = options
 
-def make_reload_coordinator(seconds_since_rx: float = 0.0):
+
+def make_reload_coordinator(
+    seconds_since_rx: float = 0.0, options: dict[str, Any] | None = None
+):
     """Coordinator wired with just enough to exercise the reload paths."""
     coord = make_coordinator()
     coord._reloading = False
     coord.transport = cast(ComfoAirTransport, FakePollTransport(seconds_since_rx))
     entries = FakeConfigEntries()
     coord.hass = cast("Any", SimpleNamespace(config_entries=entries))
-    coord.entry = cast("Any", SimpleNamespace(entry_id="entry-1"))
+    coord.entry = cast(
+        "Any", SimpleNamespace(entry_id="entry-1", options=dict(options or {}))
+    )
     return coord, entries
 
 
@@ -455,12 +468,13 @@ async def test_async_set_fan_percentages_clamps_and_requires_known_values() -> N
     assert data == bytes([15, 30, 40, 50, 60, 70, 95, 80, 0x00])
 
 
-async def test_async_set_rs232_mode_sends_mode_byte() -> None:
-    coord = make_coordinator()
+async def test_async_set_rs232_mode_sends_mode_byte_and_persists() -> None:
+    coord, _ = make_reload_coordinator(options={"other": 1})
     fake = FakeTransport()
     coord.transport = cast(ComfoAirTransport, fake)
     await coord.async_set_rs232_mode("pc_master")
     assert fake.sent == [(p.CMD_SET_RS232_MODE, bytes([0x03]))]
+    assert coord.entry.options == {"other": 1, CONF_RS232_MODE: "pc_master"}
 
 
 @pytest.mark.parametrize(
@@ -501,3 +515,43 @@ async def test_update_data_does_not_reload_while_fresh() -> None:
     result = await coord._async_update_data()
     assert entries.reloaded == []
     assert result == {}  # no parsers ran; just proves the happy path returns state
+
+
+# --- RS232 mode reapply after power loss ---------------------------------------
+
+
+def _rs232_sends(coord: ComfoAirCoordinator) -> list[bytes]:
+    sent = cast(FakePollTransport, coord.transport).sent
+    return [data for cmd, data in sent if cmd == p.CMD_SET_RS232_MODE]
+
+
+async def test_update_data_reapplies_stored_rs232_mode_once() -> None:
+    coord, _ = make_reload_coordinator(options={CONF_RS232_MODE: "pc_master"})
+    coord._rs232_reapply_pending = True  # as after setup
+    await coord._async_update_data()
+    await coord._async_update_data()
+    assert _rs232_sends(coord) == [bytes([0x03])]
+
+
+async def test_update_data_without_stored_rs232_mode_sends_nothing() -> None:
+    coord, _ = make_reload_coordinator()
+    coord._rs232_reapply_pending = True
+    await coord._async_update_data()
+    assert _rs232_sends(coord) == []
+
+
+@pytest.mark.parametrize(
+    ("gap", "expected"),
+    [(RS232_REAPPLY_GAP_SECONDS - 1, False), (RS232_REAPPLY_GAP_SECONDS + 1, True)],
+)
+def test_on_frame_gap_flags_rs232_reapply(
+    monkeypatch: pytest.MonkeyPatch, gap: float, expected: bool
+) -> None:
+    coord, _ = make_reload_coordinator()
+    coord.async_set_updated_data = lambda data: None  # type: ignore[method-assign]
+    now = 1000.0
+    monkeypatch.setattr(coordinator_module.time, "monotonic", lambda: now)
+    coord.on_frame(Frame(p.RES_SET_RS232_MODE, b"\x03"))
+    now += gap
+    coord.on_frame(Frame(p.RES_SET_RS232_MODE, b"\x03"))
+    assert coord._rs232_reapply_pending is expected

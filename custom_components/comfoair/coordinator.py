@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from datetime import timedelta
 from typing import Any, Callable
 
@@ -20,6 +21,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from . import protocol as p
 from .const import (
+    CONF_RS232_MODE,
     DOMAIN,
     FEATURE_BYPASS,
     FEATURE_ENTHALPY,
@@ -44,6 +46,9 @@ POLL_INTERVAL = timedelta(seconds=5)
 PROBE_TIMEOUT = 3.0
 POLL_REQUEST_TIMEOUT = 0.5
 STALE_RELOAD_SECONDS = 30.0
+# A gap between frames longer than this means the unit may have rebooted and
+# forgotten its RS232 mode. Normal polling keeps gaps well under POLL_INTERVAL.
+RS232_REAPPLY_GAP_SECONDS = 10.0
 
 
 class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
@@ -88,6 +93,9 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         }
         self._state: dict[str, Any] = {}
         self._reloading = False
+        self._last_frame_at: float | None = None
+        # Apply the stored RS232 mode on the first poll after setup.
+        self._rs232_reapply_pending = True
         self.transport.add_callback(self.on_frame)
         self.transport.add_disconnect_callback(self._handle_disconnect)
 
@@ -95,6 +103,15 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     def on_frame(self, frame: Frame) -> None:
         """Called by the transport for every non-ACK frame."""
+        now = time.monotonic()
+        if (
+            self._last_frame_at is not None
+            and now - self._last_frame_at > RS232_REAPPLY_GAP_SECONDS
+        ):
+            # The unit doesn't persist its RS232 mode, and going quiet is the
+            # only sign of a power loss we get.
+            self._rs232_reapply_pending = True
+        self._last_frame_at = now
         parser = _PARSERS.get(frame.msg_id)
         if parser is None:
             _LOGGER.debug(
@@ -200,6 +217,9 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     )
             # key status with nothing pressed just to get display status
             await self.async_key_status()
+            if self._rs232_reapply_pending:
+                await self._async_reapply_rs232_mode()
+                self._rs232_reapply_pending = False
         except ConnectionError as err:
             raise UpdateFailed(str(err)) from err
         # esphome serialx transport doesn't raise on connection loss (just hangs)
@@ -208,6 +228,14 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._schedule_reload(f"no data for {self.transport.seconds_since_rx:.0f}s")
             raise UpdateFailed("connection stale; reloading")
         return dict(self._state)
+
+    async def _async_reapply_rs232_mode(self) -> None:
+        """Restore the user's RS232 mode, which the unit loses on power loss."""
+        mode = self.entry.options.get(CONF_RS232_MODE)
+        if mode not in RS232_MODES:
+            return
+        _LOGGER.debug("Reapplying RS232 mode %s", mode)
+        await self.transport.send(p.CMD_SET_RS232_MODE, bytes([RS232_MODES[mode]]))
 
     # ---- parsers (data slices map directly to msg bytes in registers.h) ------
 
@@ -473,8 +501,15 @@ class ComfoAirCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         await self.transport.send(p.CMD_GET_VENTILATION_LEVEL)
 
     async def async_set_rs232_mode(self, mode: str) -> None:
-        """Switch the PC port mode; the unit echoes the new mode in 0x9C."""
+        """Switch the PC port mode; the unit echoes the new mode in 0x9C.
+
+        The mode is stored in the entry options so it can be reapplied after
+        the unit loses power.
+        """
         await self.transport.send(p.CMD_SET_RS232_MODE, bytes([RS232_MODES[mode]]))
+        self.hass.config_entries.async_update_entry(
+            self.entry, options={**self.entry.options, CONF_RS232_MODE: mode}
+        )
 
     async def async_set_comfort_temperature(self, temperature: float) -> None:
         if not MIN_TEMPERATURE <= temperature <= MAX_TEMPERATURE:

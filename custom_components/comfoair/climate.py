@@ -64,7 +64,7 @@ class ComfoAirClimate(ComfoAirEntity, ClimateEntity):
 
     _attr_translation_key = "comfoair"
     _attr_name = None  # use device name
-    _attr_temperature_unit = UnitOfTemperature.CELSIUS
+    _attr_native_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_min_temp = MIN_TEMPERATURE
     _attr_max_temp = MAX_TEMPERATURE
     _attr_target_temperature_step = 1
@@ -92,11 +92,11 @@ class ComfoAirClimate(ComfoAirEntity, ClimateEntity):
         return _LEVEL_TO_FAN.get(raw)
 
     @property
-    def current_temperature(self) -> float | None:
+    def native_current_temperature(self) -> float | None:
         return self.coordinator.data.get("current_temperature")
 
     @property
-    def target_temperature(self) -> float | None:
+    def native_target_temperature(self) -> float | None:
         return self.coordinator.data.get("target_temperature")
 
     async def async_set_fan_mode(self, fan_mode: str) -> None:
